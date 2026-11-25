@@ -1,0 +1,984 @@
+<title>Fotogramma Studio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=JetBrains+Mono:wght@500&family=Manrope:wght@400;600;700&family=Montserrat:wght@700;800;900&family=Playfair+Display:wght@700;800&family=Poppins:wght@600;700;800&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.js"></script>
+<style>
+/* Layout: editor a sinistra, monitor di anteprima fisso a destra; su telefono il monitor va in alto. Tema scuro unico, voluto (sala di montaggio). */
+:root {
+  --ink: #0f1117;          /* fondo */
+  --panel: #171a23;        /* pannelli */
+  --panel-2: #1f2330;      /* campi */
+  --line: #2b3040;
+  --text: #eceef4;
+  --muted: #9aa1b4;
+  --accent: #f2b544;       /* ambra "tally light" */
+  --accent-ink: #1a1306;
+  --rec: #ff5a5f;
+  --ok: #4fd1a5;
+  --f-display: "Bricolage Grotesque", "Manrope", system-ui, sans-serif;
+  --f-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--ink); color: var(--text); }
+body { font-family: var(--f-body); font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 40px; }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; max-width: 1360px; margin: 0 auto 16px; }
+.brandmark { display: flex; align-items: center; gap: 10px; }
+.brandmark h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+.tally { width: 10px; height: 10px; border-radius: 50%; background: var(--rec); box-shadow: 0 0 10px var(--rec); }
+.brandmark small { color: var(--muted); font-size: 12px; }
+
+.app { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 420px); gap: 20px; max-width: 1360px; margin: 0 auto; align-items: start; }
+@media (max-width: 900px) { .app { grid-template-columns: minmax(0, 1fr); } .monitor { order: -1; position: static !important; } }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.editor { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.panel-head h2 { font-size: 16px; font-weight: 800; }
+.eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field > span { font-size: 12px; color: var(--muted); font-weight: 600; }
+input[type=text], input[type=number], select, textarea { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0; }
+textarea { resize: vertical; min-height: 44px; }
+input[type=color] { width: 100%; height: 38px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); padding: 3px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+.btn { border: 1px solid var(--line); background: var(--panel-2); border-radius: 8px; padding: 8px 12px; font-weight: 700; font-size: 13px; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { background: transparent; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.templates { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.tpl { text-align: left; border: 1px solid var(--line); background: var(--panel-2); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.tpl b { font-family: var(--f-display); font-size: 14px; }
+.tpl span { color: var(--muted); font-size: 12px; }
+.tpl .sw { display: flex; gap: 4px; }
+.tpl .sw i { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(255,255,255,.15); }
+
+.scenes { display: flex; flex-direction: column; gap: 10px; }
+.scene { border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.scene.active { border-color: var(--accent); }
+.scene-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.scene-head .tc { font-family: var(--f-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.scene-head select { width: auto; flex: 1 1 140px; }
+.scene-head input[type=number] { width: 76px; }
+.icon-btn { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; width: 32px; height: 32px; display: grid; place-items: center; font-size: 14px; }
+.scene textarea { min-height: 40px; }
+.hint { color: var(--muted); font-size: 12px; }
+.hint code { font-family: var(--f-mono); background: var(--panel-2); padding: 1px 5px; border-radius: 4px; color: var(--text); }
+
+.monitor { position: sticky; top: max(16px, env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 12px; }
+.screen { background: #000; border-radius: 14px; border: 1px solid var(--line); display: grid; place-items: center; padding: 10px; }
+.screen canvas { display: block; max-width: 100%; max-height: 64vh; border-radius: 6px; }
+.transport { display: flex; align-items: center; gap: 10px; }
+.transport .tc { font-family: var(--f-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.play { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); border: 0; font-weight: 800; flex: none; }
+
+.export-box { display: flex; flex-direction: column; gap: 10px; }
+.bar { height: 8px; border-radius: 4px; background: var(--panel-2); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+.status { font-size: 13px; color: var(--muted); }
+.status.err { color: var(--rec); }
+.status.ok { color: var(--ok); }
+video.result { width: 100%; max-height: 50vh; border-radius: 8px; background: #000; }
+
+.caption-out { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; white-space: pre-wrap; font-size: 13px; min-height: 60px; }
+.ai-chip { font-size: 11px; font-weight: 800; color: var(--accent-ink); background: var(--accent); border-radius: 999px; padding: 2px 8px; }
+details summary { cursor: pointer; font-weight: 700; }
+.logo-prev { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); background: var(--panel-2); }
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+
+<header class="top">
+  <div class="brandmark">
+    <span class="tally" aria-hidden="true"></span>
+    <div>
+      <h1>Fotogramma Studio</h1>
+      <small>Video verticali per TikTok, Reels e Shorts</small>
+    </div>
+  </div>
+  <div class="row">
+    <label class="field" style="flex-direction:row;align-items:center;gap:8px"><span>Formato</span>
+      <select id="format">
+        <option value="9:16">9:16 · TikTok / Reels</option>
+        <option value="4:5">4:5 · Feed Instagram</option>
+        <option value="1:1">1:1 · Quadrato</option>
+        <option value="16:9">16:9 · YouTube</option>
+      </select>
+    </label>
+  </div>
+</header>
+
+<main class="app">
+  <section class="editor">
+
+    <div class="panel">
+      <div class="panel-head"><h2>Parti da un modello</h2><span class="eyebrow">I nomi dei negozi sono esempi</span></div>
+      <div class="templates" id="templates"></div>
+    </div>
+
+    <div class="panel" id="ai-panel" hidden>
+      <div class="panel-head"><h2>Scrivi lo script con l'AI <span class="ai-chip">Claude</span></h2></div>
+      <div class="grid">
+        <label class="field" style="grid-column:1/-1"><span>Cosa vuoi promuovere?</span>
+          <textarea id="ai-what" rows="2">Ebook "Intelligenza Artificiale per principianti", 5 € su Etsy: guida semplice per capire l'AI e creare testi, immagini e video con gli strumenti AI.</textarea></label>
+        <label class="field"><span>Pubblico</span><input type="text" id="ai-who" value="Principianti curiosi, 25-55 anni"></label>
+        <label class="field"><span>Obiettivo</span>
+          <select id="ai-goal"><option>Vendere (clic sul link in bio)</option><option>Farsi conoscere / follower</option><option>Insegnare un trucco utile</option><option>Lancio di una novità</option></select></label>
+        <label class="field"><span>Lingua</span><select id="ai-lang"><option>Italiano</option><option>English</option><option>Español</option><option>Français</option><option>Deutsch</option><option>Română</option></select></label>
+        <label class="field"><span>Tono</span><select id="ai-tone"><option>Energico e diretto</option><option>Amichevole</option><option>Elegante</option><option>Divertente</option><option>Autorevole</option></select></label>
+      </div>
+      <div class="row"><button class="btn primary" id="ai-go">Genera script e didascalia</button><span class="status" id="ai-status"></span></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Scene</h2>
+        <div class="row">
+          <button class="btn" id="auto-dur" title="Calcola la durata di ogni scena in base alle parole">Durate automatiche</button>
+          <button class="btn primary" id="add-scene">+ Scena</button>
+        </div>
+      </div>
+      <p class="hint">Metti tra asterischi le parole da evidenziare: <code>Inizia *oggi*</code>. Nei punti elenco scrivi una voce per riga. Il gancio dei primi 2 secondi decide se le persone restano.</p>
+      <div class="scenes" id="scenes"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Kit del brand</h2>
+        <div class="row">
+          <select id="brand-list" aria-label="Brand salvati" style="width:auto"></select>
+          <button class="btn" id="brand-save">Salva brand</button>
+          <button class="btn ghost" id="brand-del">Elimina</button>
+        </div>
+      </div>
+      <div class="grid">
+        <label class="field"><span>Nome brand</span><input type="text" id="b-name"></label>
+        <label class="field"><span>Handle social</span><input type="text" id="b-handle"></label>
+        <label class="field"><span>Sfondo</span><input type="color" id="b-c1"></label>
+        <label class="field"><span>Sfondo 2</span><input type="color" id="b-c2"></label>
+        <label class="field"><span>Accento</span><input type="color" id="b-accent"></label>
+        <label class="field"><span>Testo</span><input type="color" id="b-text"></label>
+        <label class="field"><span>Font</span><select id="b-font">
+          <option>Montserrat</option><option>Poppins</option><option>Anton</option><option>Bebas Neue</option><option>Playfair Display</option></select></label>
+        <label class="field"><span>Sfondo animato</span><select id="b-style">
+          <option value="stelle">Spazio con stelle</option><option value="aurora">Aurora morbida</option><option value="griglia">Griglia retrò</option><option value="pulito">Pulito</option></select></label>
+        <label class="field"><span>Evidenziazione</span><select id="b-hl">
+          <option value="colore">Colore accento</option><option value="box">Evidenziatore</option></select></label>
+        <label class="field"><span>Transizione</span><select id="b-trans">
+          <option value="zoom">Zoom</option><option value="slide">Scorrimento</option><option value="fade">Dissolvenza</option></select></label>
+        <div class="field"><span>Logo (tondo)</span>
+          <div class="row"><img id="logo-prev" class="logo-prev" alt="" hidden><input type="file" id="b-logo" accept="image/*" style="max-width:100%"></div></div>
+      </div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="b-upper"> Tutto maiuscolo</label>
+        <label class="check"><input type="checkbox" id="b-watermark" checked> Logo e handle nel video</label>
+        <label class="check"><input type="checkbox" id="b-progress" checked> Barra di avanzamento</label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Audio</h2></div>
+      <div class="grid">
+        <label class="field"><span>Base musicale</span><select id="a-beat">
+          <option value="none">Nessuna</option><option value="pulse" selected>Pulse (integrata)</option><option value="lofi">Lo-fi (integrata)</option><option value="file">Il mio file audio</option></select></label>
+        <label class="field" id="a-file-wrap" hidden><span>File musica</span><input type="file" id="a-file" accept="audio/*"></label>
+        <label class="field"><span>Volume musica</span><input type="range" id="a-vol" min="0" max="1" step="0.05" value="0.6"></label>
+      </div>
+      <label class="check"><input type="checkbox" id="a-whoosh" checked> Effetto "whoosh" ai cambi scena</label>
+      <p class="hint">Su TikTok i video vanno meglio con un suono di tendenza: esporta con la base leggera e aggiungi il suono di tendenza nell'app, abbassando il volume originale.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Didascalia e hashtag</h2><button class="btn" id="cap-copy">Copia</button></div>
+      <textarea id="caption" rows="4" aria-label="Didascalia"></textarea>
+    </div>
+  </section>
+
+  <aside class="monitor">
+    <div class="screen"><canvas id="preview" aria-label="Anteprima video"></canvas></div>
+    <div class="transport">
+      <button class="play" id="play" aria-label="Riproduci">▶</button>
+      <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Posizione">
+      <span class="tc" id="tc">00:00.0 / 00:00.0</span>
+    </div>
+    <label class="check"><input type="checkbox" id="safe"> Mostra aree coperte dall'interfaccia di TikTok</label>
+    <div class="panel export-box">
+      <div class="panel-head"><h2>Esporta</h2><span class="eyebrow" id="exp-spec">1080×1920 · 30 fps · MP4</span></div>
+      <div class="row"><button class="btn primary" id="export">Crea video MP4</button><button class="btn" id="download" hidden>Salva il video</button></div>
+      <div class="bar"><i id="exp-bar"></i></div>
+      <div class="status" id="exp-status">Pronto.</div>
+      <video class="result" id="result" controls playsinline hidden></video>
+    </div>
+  </aside>
+</main>
+
+<script>
+"use strict";
+/* ================= Dati ================= */
+const FORMATS = { "9:16": [1080, 1920], "4:5": [1080, 1350], "1:1": [1080, 1080], "16:9": [1920, 1080] };
+const FONT_W = { "Montserrat": 900, "Poppins": 800, "Anton": 400, "Bebas Neue": 400, "Playfair Display": 800 };
+const FPS = 30;
+const TYPES = {
+  hook:    { label: "Gancio (apertura)", f: { text: "Testo principale", sub: "Sottotesto (facoltativo)" } },
+  list:    { label: "Elenco punti",      f: { text: "Titolo", sub: "Punti, uno per riga" } },
+  product: { label: "Prodotto",          f: { text: "Titolo", sub: "Didascalia", cover: "Titolo copertina (se non carichi un'immagine)" }, img: true },
+  stat:    { label: "Numero grande",     f: { text: "Numero (es. 5€, 10x, 48h)", sub: "Descrizione" } },
+  quote:   { label: "Recensione",        f: { text: "Testo della recensione", sub: "Autore" } },
+  cta:     { label: "Invito all'azione", f: { text: "Frase finale", sub: "Testo del pulsante" } },
+};
+
+const TEMPLATES = [
+  { id: "ebook-it", name: "Ebook AI · Italiano", desc: "Promo del tuo ebook per TikTok",
+    brand: { name: "Irina B.", handle: "@irinabook.ai", c1: "#100a2b", c2: "#3a1c78", accent: "#ffc83d", text: "#ffffff", font: "Montserrat", style: "stelle", hl: "colore", trans: "zoom", upper: false, watermark: true, progress: true },
+    scenes: [
+      { type: "hook", text: "Usi ancora l'AI *solo per chattare?*", sub: "🤖 Ti stai perdendo il meglio", dur: 2.8 },
+      { type: "list", text: "Con l'AI puoi:", sub: "✍️ Scrivere testi in pochi secondi\n🎨 Creare immagini e loghi\n🎬 Fare video per i social\n⏱️ Risparmiare ore ogni settimana", dur: 5.5 },
+      { type: "product", text: "La guida *per principianti*", sub: "Spiegata semplice, passo dopo passo", cover: "INTELLIGENZA\nARTIFICIALE\nPER PRINCIPIANTI", dur: 3.6 },
+      { type: "stat", text: "5€", sub: "Meno di un caffè e un cornetto ☕", dur: 3 },
+      { type: "cta", text: "Inizia *oggi* 👇", sub: "Link in bio", dur: 3 },
+    ],
+    caption: "Vuoi iniziare con l'intelligenza artificiale ma non sai da dove partire? 📚 La mia guida per principianti ti spiega tutto in modo semplice, passo dopo passo. Link in bio 👆\n\n#intelligenzaartificiale #ai #chatgpt #imparaconTikTok #ebook #principianti #tecnologia",
+    beat: "pulse" },
+  { id: "ebook-en", name: "AI Ebook · English", desc: "The same promo for the English ebook",
+    brand: { name: "Irina B.", handle: "@irinabook.ai", c1: "#100a2b", c2: "#3a1c78", accent: "#ffc83d", text: "#ffffff", font: "Montserrat", style: "stelle", hl: "colore", trans: "zoom", upper: false, watermark: true, progress: true },
+    scenes: [
+      { type: "hook", text: "Still using AI *just to chat?*", sub: "🤖 You're missing the best part", dur: 2.8 },
+      { type: "list", text: "With AI you can:", sub: "✍️ Write copy in seconds\n🎨 Create images and logos\n🎬 Make videos for social media\n⏱️ Save hours every week", dur: 5.5 },
+      { type: "product", text: "The *beginner's* guide", sub: "Simple, step by step", cover: "ARTIFICIAL\nINTELLIGENCE\nFOR BEGINNERS", dur: 3.6 },
+      { type: "stat", text: "5€", sub: "Less than a coffee and a croissant ☕", dur: 3 },
+      { type: "cta", text: "Start *today* 👇", sub: "Link in bio", dur: 3 },
+    ],
+    caption: "Want to start with AI but don't know where to begin? 📚 My beginner's guide explains everything step by step. Link in bio 👆\n\n#artificialintelligence #ai #chatgpt #learnontiktok #ebook #beginners #tech",
+    beat: "pulse" },
+  { id: "shop", name: "Negozio · prodotto", desc: "Esempio: candele artigianali",
+    brand: { name: "Bottega Luce", handle: "@bottegaluce", c1: "#1c120d", c2: "#5b2c18", accent: "#ffb46b", text: "#fff6ec", font: "Playfair Display", style: "aurora", hl: "colore", trans: "fade", upper: false, watermark: true, progress: false },
+    scenes: [
+      { type: "hook", text: "Il regalo che *nessuno* si aspetta 🎁", sub: "", dur: 2.6 },
+      { type: "product", text: "Candele *fatte a mano*", sub: "Cera di soia · 40 ore di luce", cover: "LUCE\nN°3", dur: 3.8 },
+      { type: "quote", text: "Profumo incredibile, l'ho già ricomprata due volte!", sub: "Giulia, cliente", dur: 3.6 },
+      { type: "cta", text: "Ordina *ora*", sub: "Spedizione in 24h", dur: 3 },
+    ],
+    caption: "Il regalo che nessuno si aspetta 🎁 Candele in cera di soia fatte a mano. Ordina dal link in bio.\n\n#regalo #candele #handmade #fattoamano #idearegalo",
+    beat: "lofi" },
+  { id: "local", name: "Attività locale", desc: "Esempio: pizzeria, fondo chiaro",
+    brand: { name: "Pizzeria Forno 9", handle: "@forno9", c1: "#f7efe3", c2: "#f1d9bd", accent: "#d6452b", text: "#2a1710", font: "Anton", style: "pulito", hl: "box", trans: "slide", upper: true, watermark: true, progress: true },
+    scenes: [
+      { type: "hook", text: "3 motivi per *prenotare* stasera 🍕", sub: "", dur: 2.6 },
+      { type: "list", text: "Perché da noi", sub: "Forno a legna vero\nIngredienti dalla Campania\nTavoli all'aperto", dur: 4.8 },
+      { type: "stat", text: "48h", sub: "di lievitazione dell'impasto", dur: 3 },
+      { type: "cta", text: "Prenota *ora*", sub: "Link in bio", dur: 3 },
+    ],
+    caption: "3 motivi per prenotare stasera 🍕 Prenota dal link in bio!\n\n#pizza #pizzeria #cibo #ristorante #foodtok",
+    beat: "pulse" },
+];
+
+/* ================= Stato ================= */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+};
+function fromTemplate(t) {
+  return { format: "9:16", brand: structuredClone(t.brand), scenes: structuredClone(t.scenes), caption: t.caption,
+    audio: { beat: t.beat || "pulse", vol: 0.6, whoosh: true } };
+}
+let P = store.get("fs_project", null) || fromTemplate(TEMPLATES[0]);
+let brands = store.get("fs_brands", []);
+let musicBuffer = null;
+const images = new Map(); // dataURL -> HTMLImageElement
+
+function img(src) {
+  if (!src) return null;
+  let im = images.get(src);
+  if (!im) { im = new Image(); im.src = src; images.set(src, im); }
+  return im.complete && im.naturalWidth ? im : null;
+}
+let saveTimer = 0;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    if (!store.set("fs_project", P)) {
+      const lite = structuredClone(P); lite.scenes.forEach(s => delete s.img); lite.brand.logo = null;
+      store.set("fs_project", lite);
+    }
+  }, 300);
+  audioCache = null;
+}
+
+/* ================= Utilità ================= */
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const easeOut = t => 1 - Math.pow(1 - clamp(t), 3);
+const easeBack = t => { t = clamp(t); const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function rgba(h, a) { const [r, g, b] = hexRgb(h); return `rgba(${r},${g},${b},${a})`; }
+function lum(h) { const [r, g, b] = hexRgb(h); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; }
+function fmtTime(s) { const m = Math.floor(s / 60), r = s - m * 60; return String(m).padStart(2, "0") + ":" + r.toFixed(1).padStart(4, "0"); }
+function totalDur() { return P.scenes.reduce((a, s) => a + (+s.dur || 0), 0) || 0.1; }
+function sceneAt(t) {
+  let acc = 0;
+  for (let i = 0; i < P.scenes.length; i++) { const d = +P.scenes[i].dur || 0; if (t < acc + d || i === P.scenes.length - 1) return { i, s: P.scenes[i], local: t - acc, dur: d, start: acc }; acc += d; }
+  return null;
+}
+function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+
+/* ================= Testo ricco ================= */
+function parseRich(str, upper) {
+  const out = []; const parts = String(str || "").split("*");
+  parts.forEach((p, i) => { (upper ? p.toUpperCase() : p).split(/\s+/).filter(Boolean).forEach(w => out.push({ w, hl: i % 2 === 1 })); });
+  return out;
+}
+function setFont(ctx, px, fam, weight) { ctx.font = `${weight ?? FONT_W[fam] ?? 800} ${px}px "${fam}", "Montserrat", system-ui, sans-serif`; }
+function layout(ctx, words, px, fam, maxW, weight) {
+  setFont(ctx, px, fam, weight);
+  const sp = ctx.measureText(" ").width; const lines = []; let cur = { words: [], width: 0 };
+  let widest = 0;
+  for (const wd of words) {
+    const w = ctx.measureText(wd.w).width; widest = Math.max(widest, w);
+    const add = cur.words.length ? sp + w : w;
+    if (cur.words.length && cur.width + add > maxW) { lines.push(cur); cur = { words: [], width: 0 }; }
+    cur.words.push({ ...wd, width: w }); cur.width += cur.words.length > 1 ? sp + w : w;
+  }
+  if (cur.words.length) lines.push(cur);
+  return { lines, px, sp, widest, fam, weight };
+}
+function fit(ctx, str, o) {
+  const words = parseRich(str, o.upper); let L;
+  for (let px = o.max; px >= o.min; px -= 4) {
+    L = layout(ctx, words, px, o.fam, o.maxW, o.weight);
+    if (L.lines.length * px * o.lh <= o.maxH && L.widest <= o.maxW) break;
+  }
+  L.lh = o.lh; return L;
+}
+// Disegna testo con comparsa parola per parola. Restituisce l'altezza.
+function drawRich(ctx, L, cx, top, o) {
+  const B = o.B; const lineH = L.px * L.lh; let idx = 0;
+  const light = lum(B.c1) > 0.6;
+  ctx.textBaseline = "middle"; ctx.textAlign = "left";
+  L.lines.forEach((line, li) => {
+    let x = cx - line.width / 2; const y = top + li * lineH + lineH / 2;
+    line.words.forEach(wd => {
+      const age = o.t - (o.start + idx * (o.stagger ?? 0.07)); idx++;
+      if (age >= 0) {
+        const s = o.pop === false ? 1 : 0.55 + 0.45 * easeBack(age / 0.38);
+        const a = clamp(age / 0.14);
+        ctx.save(); ctx.globalAlpha *= a;
+        ctx.translate(x + wd.width / 2, y); ctx.scale(s, s);
+        setFont(ctx, L.px, L.fam, L.weight);
+        if (wd.hl && B.hl === "box") {
+          const pad = L.px * 0.14;
+          ctx.fillStyle = B.accent; rr(ctx, -wd.width / 2 - pad, -L.px * 0.58, wd.width + pad * 2, L.px * 1.12, L.px * 0.16); ctx.fill();
+          ctx.fillStyle = lum(B.accent) > 0.55 ? "#111" : "#fff";
+        } else {
+          ctx.shadowColor = light ? "rgba(0,0,0,0.12)" : "rgba(0,0,0,0.5)"; ctx.shadowBlur = L.px * 0.18; ctx.shadowOffsetY = L.px * 0.04;
+          ctx.fillStyle = wd.hl ? B.accent : (o.color || B.text);
+        }
+        ctx.fillText(wd.w, -wd.width / 2, L.px * 0.04);
+        ctx.restore();
+      }
+      x += wd.width + L.sp;
+    });
+  });
+  return L.lines.length * lineH;
+}
+function wordCount(str) { return parseRich(str).length; }
+
+/* ================= Sfondi ================= */
+let partCache = { key: "", list: [] };
+function particles(W, H) {
+  const key = W + "x" + H; if (partCache.key === key) return partCache.list;
+  const r = rng(7); const list = [];
+  for (let i = 0; i < 160; i++) list.push({ x: r() * W, y: r() * H, s: 0.6 + r() * 2.4, ph: r() * 6.28, sp: 6 + r() * 26, big: r() < 0.06 });
+  partCache = { key, list }; return list;
+}
+function drawBg(ctx, W, H, t, B) {
+  const m = Math.min(W, H);
+  const g = ctx.createLinearGradient(0, 0, W * 0.3, H); g.addColorStop(0, B.c1); g.addColorStop(1, B.c2);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  if (B.style === "stelle") {
+    blob(ctx, W * (0.5 + 0.25 * Math.sin(t * 0.3)), H * 0.3, m * 0.9, rgba(B.c2, 0.75));
+    blob(ctx, W * (0.4 + 0.2 * Math.cos(t * 0.25)), H * 0.85, m * 0.8, rgba(B.accent, 0.10));
+    for (const p of particles(W, H)) {
+      const y = ((p.y - t * p.sp) % H + H) % H; const a = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 2 + p.ph));
+      ctx.globalAlpha = a; ctx.fillStyle = p.big ? B.accent : "#ffffff";
+      if (p.big) { star4(ctx, p.x, y, p.s * 4 * m / 1080); } else { ctx.beginPath(); ctx.arc(p.x, y, p.s * m / 1080, 0, 6.283); ctx.fill(); }
+    }
+    ctx.globalAlpha = 1;
+  } else if (B.style === "aurora") {
+    ctx.save(); ctx.globalCompositeOperation = "lighter";
+    blob(ctx, W * (0.3 + 0.2 * Math.sin(t * 0.4)), H * (0.3 + 0.1 * Math.cos(t * 0.3)), m * 0.9, rgba(B.accent, 0.22));
+    blob(ctx, W * (0.75 + 0.15 * Math.cos(t * 0.35)), H * (0.55 + 0.12 * Math.sin(t * 0.27)), m * 0.85, rgba(B.c2, 0.6));
+    blob(ctx, W * (0.4 + 0.25 * Math.sin(t * 0.22 + 2)), H * (0.85 + 0.05 * Math.sin(t * 0.5)), m * 0.8, rgba(B.accent, 0.14));
+    ctx.restore();
+  } else if (B.style === "griglia") {
+    const hz = H * 0.62; blob(ctx, W / 2, hz, m * 0.9, rgba(B.accent, 0.28));
+    ctx.save(); ctx.strokeStyle = rgba(B.accent, 0.5); ctx.lineWidth = Math.max(1, m / 540);
+    for (let i = -12; i <= 12; i++) { ctx.beginPath(); ctx.moveTo(W / 2 + i * W * 0.02, hz); ctx.lineTo(W / 2 + i * W * 0.22, H); ctx.stroke(); }
+    const off = (t * 0.6) % 1;
+    for (let k = 0; k < 14; k++) { const z = (k + off) / 14; const y = hz + (H - hz) * z * z; ctx.globalAlpha = z; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle = rgba(B.c1, 0.0);
+  } else {
+    // pulito: luce diagonale lenta
+    const x = ((t * 0.08) % 1.6 - 0.3) * W;
+    const lg = ctx.createLinearGradient(x - W * 0.4, 0, x + W * 0.4, H * 0.4);
+    lg.addColorStop(0, "rgba(255,255,255,0)"); lg.addColorStop(0.5, lum(B.c1) > 0.6 ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.06)"); lg.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H);
+  }
+  // vignettatura
+  const v = ctx.createRadialGradient(W / 2, H / 2, m * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+  v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, lum(B.c1) > 0.6 ? "rgba(0,0,0,0.06)" : "rgba(0,0,0,0.35)");
+  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+}
+function blob(ctx, x, y, r, c) { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, c); g.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+function star4(ctx, x, y, r) { ctx.beginPath(); ctx.moveTo(x, y - r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.quadraticCurveTo(x, y, x, y + r); ctx.quadraticCurveTo(x, y, x - r, y); ctx.quadraticCurveTo(x, y, x, y - r); ctx.fill(); }
+
+/* ================= Scene ================= */
+function zone(W, H) {
+  const tall = H / W > 1.5;
+  return { top: tall ? H * 0.15 : H * 0.09, bottom: tall ? H * 0.76 : H * 0.9, maxW: W * (W > H ? 0.78 : 0.84), u: Math.min(W, H) / 1080 };
+}
+function drawScene(ctx, W, H, sc, lt, dur, B) {
+  const Z = zone(W, H), u = Z.u, cx = W / 2, zh = Z.bottom - Z.top, fam = B.font, up = B.upper;
+  const T = (s, o) => fit(ctx, s, { fam, upper: up, maxW: Z.maxW, lh: 1.12, ...o });
+  switch (sc.type) {
+    case "hook": {
+      const L = T(sc.text, { max: 120 * u, min: 48 * u, maxH: zh * 0.55 });
+      const S = sc.sub ? T(sc.sub, { max: 50 * u, min: 30 * u, maxH: zh * 0.2, weight: 700 }) : null;
+      const h1 = L.lines.length * L.px * L.lh, h2 = S ? S.lines.length * S.px * S.lh + 40 * u : 0;
+      const top = Z.top + (zh - h1 - h2) / 2 - zh * 0.04;
+      drawRich(ctx, L, cx, top, { t: lt, start: 0.05, stagger: 0.09, B });
+      if (S) { const n = wordCount(sc.text); ctx.globalAlpha = 0.92; drawRich(ctx, S, cx, top + h1 + 40 * u, { t: lt, start: 0.25 + n * 0.09, stagger: 0.04, B }); ctx.globalAlpha = 1; }
+      break;
+    }
+    case "list": {
+      const items = String(sc.sub || "").split("\n").map(s => s.trim()).filter(Boolean);
+      const L = T(sc.text, { max: 96 * u, min: 44 * u, maxH: zh * 0.22 });
+      const hT = L.lines.length * L.px * L.lh;
+      drawRich(ctx, L, cx, Z.top, { t: lt, start: 0, stagger: 0.06, B });
+      const avail = zh - hT - 40 * u; const gap = 22 * u;
+      const rowH = Math.min(190 * u, (avail - gap * (items.length - 1)) / Math.max(1, items.length));
+      const cardW = Z.maxW; const x0 = cx - cardW / 2; const numR = Math.min(rowH * 0.3, 34 * u);
+      const textW = cardW - numR * 2 - 70 * u;
+      const per = Math.min(0.55, (dur - 1.2) / Math.max(1, items.length));
+      items.forEach((it, i) => {
+        const age = lt - (0.45 + i * per); if (age < 0) return;
+        const e = easeOut(age / 0.45); const y = Z.top + hT + 40 * u + i * (rowH + gap);
+        ctx.save(); ctx.globalAlpha = clamp(age / 0.25); ctx.translate((1 - e) * -W * 0.25, 0);
+        ctx.fillStyle = lum(B.c1) > 0.6 ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.09)";
+        rr(ctx, x0, y, cardW, rowH, 22 * u); ctx.fill();
+        ctx.strokeStyle = rgba(B.accent, 0.45); ctx.lineWidth = 2 * u; ctx.stroke();
+        ctx.fillStyle = B.accent; ctx.beginPath(); ctx.arc(x0 + 30 * u + numR, y + rowH / 2, numR, 0, 6.283); ctx.fill();
+        setFont(ctx, numR * 1.1, fam); ctx.fillStyle = lum(B.accent) > 0.55 ? "#111" : "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(String(i + 1), x0 + 30 * u + numR, y + rowH / 2 + numR * 0.05);
+        const IL = fit(ctx, it, { fam, upper: up, maxW: textW, lh: 1.1, max: 54 * u, min: 26 * u, maxH: rowH * 0.8, weight: fam === "Anton" || fam === "Bebas Neue" ? 400 : 700 });
+        const ih = IL.lines.length * IL.px * IL.lh; const tx = x0 + 30 * u + numR * 2 + 30 * u;
+        ctx.textAlign = "left"; setFont(ctx, IL.px, fam, IL.weight); ctx.fillStyle = B.text;
+        IL.lines.forEach((ln, k) => { let x = tx; ln.words.forEach(wd => { ctx.fillStyle = wd.hl ? B.accent : B.text; ctx.fillText(wd.w, x, y + (rowH - ih) / 2 + k * IL.px * IL.lh + IL.px * IL.lh / 2); x += wd.width + IL.sp; }); });
+        ctx.restore();
+      });
+      break;
+    }
+    case "product": {
+      const L = T(sc.text, { max: 92 * u, min: 42 * u, maxH: zh * 0.2 });
+      const hT = L.lines.length * L.px * L.lh;
+      drawRich(ctx, L, cx, Z.top, { t: lt, start: 0.1, stagger: 0.07, B });
+      const S = sc.sub ? T(sc.sub, { max: 48 * u, min: 28 * u, maxH: zh * 0.12, weight: 700 }) : null;
+      const hS = S ? S.lines.length * S.px * S.lh : 0;
+      const boxTop = Z.top + hT + 30 * u, boxH = zh - hT - hS - 70 * u; const midY = boxTop + boxH / 2;
+      const e = easeBack(lt / 0.7); const im = img(sc.img);
+      ctx.save(); ctx.globalAlpha = clamp(lt / 0.3); ctx.translate(cx, midY + Math.sin(lt * 1.6) * 10 * u); ctx.scale(0.7 + 0.3 * e, 0.7 + 0.3 * e);
+      blob(ctx, 0, 0, boxH * 0.7, rgba(B.accent, 0.25));
+      if (im) {
+        const kb = 1 + 0.05 * clamp(lt / Math.max(dur, 0.1)); const s = Math.min(Z.maxW * 0.9 / im.naturalWidth, boxH / im.naturalHeight) * kb;
+        const w = im.naturalWidth * s, h = im.naturalHeight * s;
+        ctx.rotate(Math.sin(lt * 1.2) * 0.02);
+        ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 50 * u; ctx.shadowOffsetY = 24 * u;
+        rr(ctx, -w / 2, -h / 2, w, h, 18 * u); ctx.fillStyle = "#000"; ctx.fill(); ctx.shadowColor = "transparent";
+        ctx.save(); rr(ctx, -w / 2, -h / 2, w, h, 18 * u); ctx.clip(); ctx.drawImage(im, -w / 2, -h / 2, w, h); shine(ctx, w, h, lt); ctx.restore();
+      } else {
+        drawBook(ctx, Math.min(boxH, Z.maxW * 1.1), sc.cover || B.name, lt, B, u);
+      }
+      ctx.restore();
+      if (S) drawRich(ctx, S, cx, Z.bottom - hS, { t: lt, start: 0.6, stagger: 0.04, B });
+      break;
+    }
+    case "stat": {
+      const raw = String(sc.text || ""); const m = raw.match(/\d+(?:[.,]\d+)?/);
+      let shown = raw;
+      if (m) {
+        const num = parseFloat(m[0].replace(",", ".")); const dec = (m[0].split(/[.,]/)[1] || "").length;
+        const v = num * easeOut(lt / 1.2); let s = v.toFixed(dec); if (m[0].includes(",")) s = s.replace(".", ",");
+        shown = raw.slice(0, m.index) + s + raw.slice(m.index + m[0].length);
+      }
+      const L = fit(ctx, raw, { fam, upper: up, maxW: Z.maxW, lh: 1, max: 330 * u, min: 90 * u, maxH: zh * 0.4 });
+      const S = sc.sub ? T(sc.sub, { max: 60 * u, min: 32 * u, maxH: zh * 0.25, weight: 700 }) : null;
+      const hS = S ? S.lines.length * S.px * S.lh + 50 * u : 0; const cy = Z.top + (zh - L.px - hS) / 2 + L.px / 2;
+      const sc2 = 0.6 + 0.4 * easeBack(lt / 0.6);
+      ctx.save(); ctx.translate(cx, cy); ctx.scale(sc2, sc2); setFont(ctx, L.px, fam); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.shadowColor = rgba(B.accent, 0.6); ctx.shadowBlur = 60 * u; ctx.fillStyle = B.accent; ctx.fillText(up ? shown.toUpperCase() : shown, 0, 0); ctx.restore();
+      if (S) drawRich(ctx, S, cx, cy + L.px / 2 + 50 * u, { t: lt, start: 0.7, stagger: 0.05, B });
+      break;
+    }
+    case "quote": {
+      const n = 5, sr = 30 * u; const sy = Z.top + zh * 0.12;
+      for (let i = 0; i < n; i++) { const age = lt - 0.1 - i * 0.12; if (age < 0) continue; const s = easeBack(age / 0.4); ctx.save(); ctx.translate(cx + (i - 2) * sr * 2.6, sy); ctx.scale(s, s); ctx.fillStyle = B.accent; starPoly(ctx, sr); ctx.restore(); }
+      const L = fit(ctx, "“" + (sc.text || "") + "”", { fam, upper: up, maxW: Z.maxW * 0.86, lh: 1.18, max: 70 * u, min: 34 * u, maxH: zh * 0.5, weight: fam === "Playfair Display" ? 700 : undefined });
+      const h = L.lines.length * L.px * L.lh; const cardY = sy + 70 * u; const pad = 50 * u;
+      ctx.save(); ctx.globalAlpha = clamp((lt - 0.3) / 0.3);
+      ctx.fillStyle = lum(B.c1) > 0.6 ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.08)"; rr(ctx, cx - Z.maxW / 2, cardY, Z.maxW, h + pad * 2 + (sc.sub ? 80 * u : 0), 30 * u); ctx.fill(); ctx.restore();
+      drawRich(ctx, L, cx, cardY + pad, { t: lt, start: 0.5, stagger: 0.035, B, pop: false });
+      if (sc.sub) { setFont(ctx, 38 * u, fam, 700); ctx.fillStyle = B.accent; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.globalAlpha = clamp((lt - 1) / 0.4); ctx.fillText("— " + (up ? sc.sub.toUpperCase() : sc.sub), cx, cardY + pad + h + 50 * u); ctx.globalAlpha = 1; }
+      break;
+    }
+    case "cta": {
+      const L = T(sc.text, { max: 120 * u, min: 50 * u, maxH: zh * 0.4 });
+      const h1 = L.lines.length * L.px * L.lh; const top = Z.top + Math.max(0, (zh - h1 - 360 * u) / 2);
+      drawRich(ctx, L, cx, top, { t: lt, start: 0.05, stagger: 0.09, B });
+      if (sc.sub) {
+        const age = lt - 0.5; if (age > 0) {
+          setFont(ctx, 54 * u, fam); const label = up ? sc.sub.toUpperCase() : sc.sub; const tw = Math.min(ctx.measureText(label).width, Z.maxW - 120 * u);
+          const bw = tw + 120 * u, bh = 120 * u, by = top + h1 + 80 * u + bh / 2;
+          const s = easeBack(age / 0.45) * (1 + 0.04 * Math.sin(lt * 6));
+          ctx.save(); ctx.translate(cx, by); ctx.scale(s, s);
+          ctx.shadowColor = rgba(B.accent, 0.7); ctx.shadowBlur = 40 * u; ctx.fillStyle = B.accent; rr(ctx, -bw / 2, -bh / 2, bw, bh, bh / 2); ctx.fill();
+          ctx.shadowColor = "transparent"; ctx.fillStyle = lum(B.accent) > 0.55 ? "#111" : "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText(label, 0, 4 * u, Z.maxW - 120 * u); ctx.restore();
+          // freccia che rimbalza
+          ctx.save(); ctx.globalAlpha = clamp((age - 0.3) / 0.3); ctx.strokeStyle = B.text; ctx.lineWidth = 10 * u; ctx.lineCap = "round"; ctx.lineJoin = "round";
+          const ay = by + bh / 2 + 70 * u + Math.abs(Math.sin(lt * 4)) * 24 * u;
+          ctx.beginPath(); ctx.moveTo(cx - 34 * u, ay); ctx.lineTo(cx, ay + 34 * u); ctx.lineTo(cx + 34 * u, ay); ctx.stroke(); ctx.restore();
+        }
+      }
+      break;
+    }
+  }
+}
+function starPoly(ctx, r) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5; const rr2 = i % 2 ? r * 0.45 : r; ctx.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2); } ctx.closePath(); ctx.fill(); }
+function shine(ctx, w, h, t) {
+  const x = ((t * 0.45) % 1.8 - 0.4) * w * 1.6 - w / 2;
+  const g = ctx.createLinearGradient(x - w * 0.25, -h / 2, x + w * 0.25, h / 2);
+  g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(0.5, "rgba(255,255,255,0.22)"); g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g; ctx.fillRect(-w / 2, -h / 2, w, h);
+}
+function drawBook(ctx, h, title, t, B, u) {
+  const w = h * 0.68; ctx.save(); ctx.rotate(Math.sin(t * 1.2) * 0.025);
+  ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.ellipse(0, h / 2 + 30 * u, w * 0.55, 22 * u, 0, 0, 6.283); ctx.fill();
+  // pagine
+  ctx.fillStyle = "#efe9dc"; rr(ctx, -w / 2 + 10 * u, -h / 2 + 12 * u, w + 14 * u, h - 14 * u, 10 * u); ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.12)"; ctx.lineWidth = 1.5 * u; for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.moveTo(w / 2 + 2 * u + i * 2 * u, -h / 2 + 20 * u); ctx.lineTo(w / 2 + 2 * u + i * 2 * u, h / 2 - 8 * u); ctx.stroke(); }
+  // copertina
+  ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 40 * u; ctx.shadowOffsetY = 20 * u;
+  const g = ctx.createLinearGradient(0, -h / 2, 0, h / 2); g.addColorStop(0, "#0b0820"); g.addColorStop(0.55, B.c2); g.addColorStop(1, B.c1);
+  ctx.fillStyle = g; rr(ctx, -w / 2, -h / 2, w, h, 12 * u); ctx.fill(); ctx.shadowColor = "transparent";
+  ctx.save(); rr(ctx, -w / 2, -h / 2, w, h, 12 * u); ctx.clip();
+  // anelli decorativi
+  const cy = h * 0.18; blob(ctx, 0, cy, w * 0.55, rgba(B.accent, 0.35));
+  ctx.strokeStyle = rgba(B.accent, 0.7); ctx.lineWidth = 3 * u;
+  for (let k = 1; k <= 3; k++) { ctx.globalAlpha = 0.9 - k * 0.2; ctx.beginPath(); ctx.arc(0, cy, w * 0.1 * k + Math.sin(t * 2 + k) * 4 * u, 0, 6.283); ctx.stroke(); }
+  ctx.globalAlpha = 1; const r = rng(3); ctx.fillStyle = B.accent;
+  for (let i = 0; i < 40; i++) { const a = r() * 6.283, d = w * (0.08 + r() * 0.32); ctx.globalAlpha = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(t * 3 + i)); ctx.beginPath(); ctx.arc(Math.cos(a) * d, cy + Math.sin(a) * d * 0.7, 3 * u, 0, 6.283); ctx.fill(); }
+  ctx.globalAlpha = 1;
+  // titolo
+  const lines = String(title || "").split("\n").filter(Boolean); const maxW = w * 0.84; let y = -h / 2 + h * 0.1;
+  lines.forEach((ln, i) => {
+    let px = (i === lines.length - 1 && lines.length > 1 ? 0.075 : 0.11) * h; setFont(ctx, px, B.font);
+    while (ctx.measureText(ln).width > maxW && px > 10) { px -= 2; setFont(ctx, px, B.font); }
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    if (i === lines.length - 1 && lines.length > 1) { const tw = ctx.measureText(ln).width; ctx.fillStyle = B.accent; ctx.fillRect(-tw / 2 - 14 * u, y - 6 * u, tw + 28 * u, px * 1.2); ctx.fillStyle = "#14102a"; }
+    else ctx.fillStyle = "#ffffff";
+    ctx.fillText(ln, 0, y); y += px * 1.18;
+  });
+  // dorso
+  const sg = ctx.createLinearGradient(-w / 2, 0, -w / 2 + w * 0.08, 0); sg.addColorStop(0, "rgba(0,0,0,0.5)"); sg.addColorStop(1, "rgba(255,255,255,0.08)");
+  ctx.fillStyle = sg; ctx.fillRect(-w / 2, -h / 2, w * 0.08, h);
+  shine(ctx, w, h, t); ctx.restore(); ctx.restore();
+}
+
+/* ================= Fotogramma completo ================= */
+function renderFrame(ctx, W, H, t, opts = {}) {
+  const B = P.brand; const D = totalDur();
+  drawBg(ctx, W, H, t, B);
+  const cur = sceneAt(Math.min(t, D - 1e-4)); if (!cur) return;
+  const ENTER = 0.42, EXIT = 0.22; const u = Math.min(W, H) / 1080;
+  ctx.save();
+  const ein = easeOut(cur.local / ENTER); const isLast = cur.i === P.scenes.length - 1;
+  const eout = isLast ? 0 : clamp((cur.local - (cur.dur - EXIT)) / EXIT);
+  ctx.globalAlpha = clamp(cur.local / 0.2) * (1 - eout);
+  if (B.trans === "zoom") { const s = 1.12 - 0.12 * ein + 0.08 * eout; ctx.translate(W / 2, H / 2); ctx.scale(s, s); ctx.translate(-W / 2, -H / 2); }
+  else if (B.trans === "slide") { ctx.translate((1 - ein) * W * 0.35 - eout * W * 0.35, 0); }
+  drawScene(ctx, W, H, cur.s, cur.local, cur.dur, B);
+  ctx.restore();
+  // marchio
+  if (B.watermark) {
+    const tall = H / W > 1.5; const y = tall ? H * 0.105 : H * 0.05; const lg = img(B.logo); const r = 30 * u;
+    setFont(ctx, 30 * u, "Montserrat", 800); const label = B.handle || B.name || ""; const tw = ctx.measureText(label).width;
+    const total = (lg ? r * 2 + 14 * u : 0) + tw; let x = W / 2 - total / 2;
+    ctx.globalAlpha = 0.92;
+    if (lg) { ctx.save(); ctx.beginPath(); ctx.arc(x + r, y, r, 0, 6.283); ctx.clip(); ctx.drawImage(lg, x, y - r, r * 2, r * 2); ctx.restore(); x += r * 2 + 14 * u; }
+    ctx.fillStyle = B.text; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 8 * u; ctx.fillText(label, x, y); ctx.shadowColor = "transparent"; ctx.globalAlpha = 1;
+  }
+  if (B.progress) { const tall = H / W > 1.5; const y = tall ? H * 0.075 : H * 0.02; const w = W * 0.6; ctx.fillStyle = rgba(B.text, 0.18); rr(ctx, W / 2 - w / 2, y, w, 8 * u, 4 * u); ctx.fill(); ctx.fillStyle = B.accent; rr(ctx, W / 2 - w / 2, y, w * clamp(t / D), 8 * u, 4 * u); ctx.fill(); }
+  if (opts.safe) {
+    ctx.fillStyle = "rgba(255,40,80,0.28)"; ctx.fillRect(0, 0, W, H * 0.065); ctx.fillRect(0, H * 0.8, W, H * 0.2); ctx.fillRect(W * 0.86, H * 0.42, W * 0.14, H * 0.38);
+    setFont(ctx, 26 * u, "Montserrat", 700); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.fillText("Didascalia e nome utente di TikTok", W / 2, H * 0.9);
+  }
+}
+
+/* ================= Anteprima ================= */
+const cv = document.getElementById("preview"); const pctx = cv.getContext("2d");
+let playing = false, playT = 0, lastTs = 0, actx = null, srcNode = null;
+function sizePreview() { const [W, H] = FORMATS[P.format]; const k = 0.5; cv.width = W * k; cv.height = H * k; cv.style.aspectRatio = W + "/" + H; document.getElementById("exp-spec").textContent = `${W}×${H} · ${FPS} fps · MP4`; }
+function drawPreview() {
+  const [W, H] = FORMATS[P.format]; pctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
+  renderFrame(pctx, W, H, playT, { safe: document.getElementById("safe").checked && H / W > 1.5 });
+  const D = totalDur(); document.getElementById("tc").textContent = fmtTime(playT) + " / " + fmtTime(D);
+  document.getElementById("scrub").value = Math.round(playT / D * 1000);
+  const cur = sceneAt(Math.min(playT, D - 1e-4)); document.querySelectorAll(".scene").forEach((el, i) => el.classList.toggle("active", cur && cur.i === i));
+}
+function loop(ts) {
+  if (playing) { playT += (ts - lastTs) / 1000; if (playT >= totalDur()) { playT = 0; stopAudio(); startAudio(); } }
+  lastTs = ts; drawPreview(); requestAnimationFrame(loop);
+}
+async function startAudio() {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)(); await actx.resume();
+    const buf = await getMix(); if (!buf || !playing) return;
+    srcNode = actx.createBufferSource(); srcNode.buffer = buf; srcNode.connect(actx.destination); srcNode.start(0, Math.min(playT, buf.duration - 0.01));
+  } catch (e) { console.warn(e); }
+}
+function stopAudio() { try { srcNode && srcNode.stop(); } catch (e) {} srcNode = null; }
+document.getElementById("play").onclick = () => {
+  playing = !playing; document.getElementById("play").textContent = playing ? "❚❚" : "▶";
+  document.getElementById("play").setAttribute("aria-label", playing ? "Pausa" : "Riproduci");
+  if (playing) startAudio(); else stopAudio();
+};
+document.getElementById("scrub").oninput = e => { playT = e.target.value / 1000 * totalDur(); if (playing) { stopAudio(); startAudio(); } };
+
+/* ================= Audio ================= */
+let audioCache = null;
+const SR = 48000;
+async function getMix() {
+  const D = totalDur();
+  if (audioCache) return audioCache;
+  const A = P.audio; if (A.beat === "none" && !A.whoosh) return null;
+  if (A.beat === "file" && !musicBuffer && !A.whoosh) return null;
+  const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const oc = new OC(2, Math.ceil(SR * D), SR);
+  const master = oc.createGain(); master.connect(oc.destination);
+  const music = oc.createGain(); music.gain.value = 0; music.connect(master);
+  const vol = +A.vol; music.gain.setValueAtTime(0, 0); music.gain.linearRampToValueAtTime(vol, 0.4);
+  music.gain.setValueAtTime(vol, Math.max(0.5, D - 1.2)); music.gain.linearRampToValueAtTime(0, D);
+  const noise = oc.createBuffer(1, SR, SR); const nd = noise.getChannelData(0); const r = rng(11); for (let i = 0; i < SR; i++) nd[i] = r() * 2 - 1;
+  if (A.beat === "file" && musicBuffer) { const s = oc.createBufferSource(); s.buffer = musicBuffer; s.loop = true; s.connect(music); s.start(0); }
+  if (A.beat === "pulse" || A.beat === "lofi") synthBeat(oc, music, D, A.beat, noise);
+  if (A.whoosh) {
+    let acc = 0; P.scenes.slice(0, -1).forEach(s => { acc += +s.dur || 0; whoosh(oc, master, Math.max(0, acc - 0.25), noise); });
+  }
+  audioCache = await oc.startRendering(); return audioCache;
+}
+function synthBeat(oc, out, D, kind, noise) {
+  const bpm = kind === "lofi" ? 82 : 112; const beat = 60 / bpm;
+  const chords = kind === "lofi" ? [[57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 65], [52, 55, 59, 62]] : [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]];
+  const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+  const lp = oc.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = kind === "lofi" ? 1400 : 2600; lp.connect(out);
+  for (let b = 0, t = 0; t < D; b++, t = b * beat) {
+    // cassa
+    const o = oc.createOscillator(), g = oc.createGain(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.15);
+    g.gain.setValueAtTime(kind === "lofi" && b % 2 ? 0.0001 : 0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.32); o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.35);
+    // hi-hat
+    for (const off of [0.5]) { const ht = t + off * beat; if (ht >= D) continue; const n = oc.createBufferSource(); n.buffer = noise; const hp = oc.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 7000; const hg = oc.createGain(); hg.gain.setValueAtTime(0.18, ht); hg.gain.exponentialRampToValueAtTime(0.001, ht + 0.06); n.connect(hp); hp.connect(hg); hg.connect(out); n.start(ht, (b * 0.13) % 0.8); n.stop(ht + 0.07); }
+    // accordo ogni battuta
+    if (b % 4 === 0) {
+      const ch = chords[(b / 4) % chords.length]; const len = beat * 4;
+      ch.forEach(m => { const o2 = oc.createOscillator(); o2.type = kind === "lofi" ? "triangle" : "sawtooth"; o2.frequency.value = mtof(m); o2.detune.value = (m % 3 - 1) * 6;
+        const g2 = oc.createGain(); g2.gain.setValueAtTime(0.0001, t); g2.gain.linearRampToValueAtTime(kind === "lofi" ? 0.07 : 0.035, t + 0.08); g2.gain.linearRampToValueAtTime(0.0001, t + len); o2.connect(g2); g2.connect(lp); o2.start(t); o2.stop(t + len + 0.05); });
+      const bass = oc.createOscillator(); bass.type = "sine"; bass.frequency.value = mtof(ch[0] - 24); const bg = oc.createGain(); bg.gain.setValueAtTime(0.25, t); bg.gain.linearRampToValueAtTime(0.0001, t + len); bass.connect(bg); bg.connect(out); bass.start(t); bass.stop(t + len);
+    }
+  }
+}
+function whoosh(oc, out, t, noise) {
+  const n = oc.createBufferSource(); n.buffer = noise; const bp = oc.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 1.2;
+  bp.frequency.setValueAtTime(400, t); bp.frequency.exponentialRampToValueAtTime(5000, t + 0.4);
+  const g = oc.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.35, t + 0.22); g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+  n.connect(bp); bp.connect(g); g.connect(out); n.start(t); n.stop(t + 0.5);
+}
+
+/* ================= Esportazione ================= */
+let lastBlob = null, lastName = "";
+const downloadsP = (window.claude && window.claude.use) ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null);
+function setStatus(msg, cls = "") { const el = document.getElementById("exp-status"); el.textContent = msg; el.className = "status " + cls; }
+async function exportVideo() {
+  const btn = document.getElementById("export"); btn.disabled = true; document.getElementById("download").hidden = true;
+  const bar = document.getElementById("exp-bar"); bar.style.width = "0%";
+  const wasPlaying = playing; if (playing) document.getElementById("play").click();
+  try {
+    const B = P.brand; await document.fonts.load(`${FONT_W[B.font]} 80px "${B.font}"`); await document.fonts.load(`700 80px "${B.font}"`); await document.fonts.load(`800 30px "Montserrat"`);
+    await Promise.all([...images.values()].map(im => im.decode().catch(() => {})));
+    const [W, H] = FORMATS[P.format]; const c = document.createElement("canvas"); c.width = W; c.height = H; const ctx = c.getContext("2d");
+    let blob;
+    if (window.VideoEncoder && window.Mp4Muxer) blob = await exportWebCodecs(c, ctx, W, H, p => bar.style.width = (p * 100).toFixed(1) + "%");
+    else blob = await exportRecorder(c, ctx, W, H, p => bar.style.width = (p * 100).toFixed(1) + "%");
+    lastBlob = blob; const ext = blob.type.includes("webm") ? "webm" : "mp4";
+    lastName = ((B.name || "video").replace(/[^\w\-]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "video") + "-" + P.format.replace(":", "x") + "." + ext;
+    const v = document.getElementById("result"); if (v.src) URL.revokeObjectURL(v.src); v.src = URL.createObjectURL(blob); v.hidden = false;
+    document.getElementById("download").hidden = false; bar.style.width = "100%";
+    setStatus(`Video pronto: ${(blob.size / 1048576).toFixed(1)} MB${exportNote}. Premi "Salva il video".`, "ok");
+  } catch (e) { console.error(e); setStatus("Esportazione non riuscita: " + (e && e.message || e) + ". Prova con Chrome o Safari aggiornati.", "err"); }
+  btn.disabled = false; if (wasPlaying) document.getElementById("play").click();
+}
+let exportNote = "";
+async function pickVideoCodec(W, H) {
+  for (const codec of ["avc1.640028", "avc1.4d0028", "avc1.640032", "avc1.42003e"]) {
+    try { const s = await VideoEncoder.isConfigSupported({ codec, width: W, height: H, bitrate: 10e6, framerate: FPS }); if (s.supported) return codec; } catch (e) {}
+  }
+  return null;
+}
+async function pickAudioCodec() {
+  if (!window.AudioEncoder) return null;
+  for (const [codec, mux] of [["mp4a.40.2", "aac"], ["opus", "opus"]]) {
+    try { const s = await AudioEncoder.isConfigSupported({ codec, sampleRate: SR, numberOfChannels: 2, bitrate: 192000 }); if (s.supported) return { codec, mux }; } catch (e) {}
+  }
+  return null;
+}
+async function exportWebCodecs(c, ctx, W, H, prog) {
+  const vcodec = await pickVideoCodec(W, H);
+  if (!vcodec) return exportRecorder(c, ctx, W, H, prog);
+  setStatus("Preparo l'audio…");
+  const mix = await getMix(); const ac = mix ? await pickAudioCodec() : null;
+  exportNote = mix && !ac ? " (questo browser non codifica l'audio: video senza musica)" : (ac && ac.mux === "opus" ? " (audio Opus)" : "");
+  const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), fastStart: "in-memory", firstTimestampBehavior: "offset",
+    video: { codec: "avc", width: W, height: H, frameRate: FPS },
+    audio: ac ? { codec: ac.mux, sampleRate: SR, numberOfChannels: 2 } : undefined });
+  let err = null;
+  const ve = new VideoEncoder({ output: (ch, meta) => muxer.addVideoChunk(ch, meta), error: e => err = e });
+  ve.configure({ codec: vcodec, width: W, height: H, bitrate: 10e6, framerate: FPS, avc: { format: "avc" } });
+  const N = Math.round(totalDur() * FPS);
+  setStatus("Creo i fotogrammi…");
+  for (let i = 0; i < N; i++) {
+    if (err) throw err;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); renderFrame(ctx, W, H, i / FPS);
+    const f = new VideoFrame(c, { timestamp: Math.round(i * 1e6 / FPS), duration: Math.round(1e6 / FPS) });
+    ve.encode(f, { keyFrame: i % (FPS * 2) === 0 }); f.close();
+    while (ve.encodeQueueSize > 6) await new Promise(r => setTimeout(r, 2));
+    if (i % 6 === 0) { prog(i / N * (ac ? 0.92 : 0.98)); setStatus(`Creo i fotogrammi… ${i}/${N}`); await new Promise(r => setTimeout(r, 0)); }
+  }
+  await ve.flush(); if (err) throw err;
+  if (ac) {
+    setStatus("Codifico l'audio…");
+    const ae = new AudioEncoder({ output: (ch, meta) => muxer.addAudioChunk(ch, meta), error: e => err = e });
+    ae.configure({ codec: ac.codec, sampleRate: SR, numberOfChannels: 2, bitrate: 192000 });
+    const L = mix.getChannelData(0), R = mix.getChannelData(1); const step = 4800;
+    for (let off = 0; off < mix.length; off += step) {
+      const n = Math.min(step, mix.length - off); const data = new Float32Array(n * 2); data.set(L.subarray(off, off + n), 0); data.set(R.subarray(off, off + n), n);
+      const ad = new AudioData({ format: "f32-planar", sampleRate: SR, numberOfFrames: n, numberOfChannels: 2, timestamp: Math.round(off / SR * 1e6), data });
+      ae.encode(ad); ad.close();
+    }
+    await ae.flush(); if (err) throw err;
+  }
+  muxer.finalize();
+  return new Blob([muxer.target.buffer], { type: "video/mp4" });
+}
+async function exportRecorder(c, ctx, W, H, prog) {
+  if (!window.MediaRecorder || !c.captureStream) throw new Error("questo browser non può creare video");
+  exportNote = " (registrato in tempo reale)";
+  const stream = c.captureStream(FPS);
+  const mix = await getMix(); let src = null, ac2 = null;
+  if (mix) { ac2 = new (window.AudioContext || window.webkitAudioContext)(); const dest = ac2.createMediaStreamDestination(); src = ac2.createBufferSource(); src.buffer = mix; src.connect(dest); dest.stream.getAudioTracks().forEach(tr => stream.addTrack(tr)); }
+  const type = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"].find(t => MediaRecorder.isTypeSupported(t)) || "";
+  const rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 10e6 }); const chunks = [];
+  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  const done = new Promise(r => rec.onstop = r);
+  const D = totalDur(); rec.start(250); if (src) src.start(); const t0 = performance.now();
+  await new Promise(res => { const step = () => { const t = (performance.now() - t0) / 1000; ctx.setTransform(1, 0, 0, 1, 0, 0); renderFrame(ctx, W, H, Math.min(t, D)); prog(t / D); setStatus("Registro il video… " + fmtTime(t)); if (t < D) requestAnimationFrame(step); else res(); }; step(); });
+  rec.stop(); await done; if (ac2) ac2.close();
+  return new Blob(chunks, { type: (type || "video/webm").split(";")[0] });
+}
+document.getElementById("export").onclick = exportVideo;
+document.getElementById("download").onclick = async () => {
+  if (!lastBlob) return;
+  const dl = await downloadsP;
+  if (dl) {
+    try { await dl.save({ filename: lastName, data: lastBlob }); setStatus("Video salvato.", "ok"); }
+    catch (e) { setStatus(e && e.code === "declined" ? "Salvataggio annullato." : "Non riesco a salvare qui: " + (e && (e.message || e.code)) + ". Apri la pagina in un browser e riprova.", e && e.code === "declined" ? "" : "err"); }
+    return;
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(lastBlob); a.download = lastName; document.body.append(a); a.click(); a.remove();
+};
+
+/* ================= Editor scene ================= */
+const scenesEl = document.getElementById("scenes");
+function sceneStart(i) { return P.scenes.slice(0, i).reduce((a, s) => a + (+s.dur || 0), 0); }
+function renderScenes() {
+  scenesEl.textContent = "";
+  P.scenes.forEach((s, i) => {
+    const el = document.createElement("div"); el.className = "scene";
+    const head = document.createElement("div"); head.className = "scene-head";
+    const tc = document.createElement("span"); tc.className = "tc"; tc.textContent = "#" + (i + 1) + " · " + fmtTime(sceneStart(i));
+    const sel = document.createElement("select"); sel.id = "s-type-" + i; sel.setAttribute("aria-label", "Tipo di scena");
+    Object.entries(TYPES).forEach(([k, v]) => { const o = document.createElement("option"); o.value = k; o.textContent = v.label; sel.append(o); }); sel.value = s.type;
+    sel.onchange = () => { s.type = sel.value; save(); renderScenes(); };
+    const dur = document.createElement("input"); dur.type = "number"; dur.min = "0.8"; dur.max = "20"; dur.step = "0.1"; dur.value = s.dur; dur.id = "s-dur-" + i; dur.title = "Durata in secondi"; dur.setAttribute("aria-label", "Durata in secondi");
+    dur.oninput = () => { s.dur = clamp(parseFloat(dur.value) || 1, 0.8, 20); save(); };
+    dur.onchange = () => renderScenes();
+    const mk = (txt, title, fn) => { const b = document.createElement("button"); b.className = "icon-btn"; b.textContent = txt; b.title = title; b.setAttribute("aria-label", title); b.onclick = fn; return b; };
+    head.append(tc, sel, dur, document.createTextNode("s"),
+      mk("↑", "Sposta su", () => { if (i > 0) { [P.scenes[i - 1], P.scenes[i]] = [P.scenes[i], P.scenes[i - 1]]; save(); renderScenes(); } }),
+      mk("↓", "Sposta giù", () => { if (i < P.scenes.length - 1) { [P.scenes[i + 1], P.scenes[i]] = [P.scenes[i], P.scenes[i + 1]]; save(); renderScenes(); } }),
+      mk("⧉", "Duplica", () => { P.scenes.splice(i + 1, 0, structuredClone(s)); save(); renderScenes(); }),
+      mk("✕", "Elimina", () => { if (P.scenes.length > 1) { P.scenes.splice(i, 1); save(); renderScenes(); } }),
+      mk("▶", "Vai a questa scena", () => { playT = sceneStart(i) + 0.01; }));
+    el.append(head);
+    const T = TYPES[s.type] || TYPES.hook;
+    Object.entries(T.f).forEach(([k, label]) => {
+      const f = document.createElement("label"); f.className = "field"; const sp = document.createElement("span"); sp.textContent = label;
+      const ta = document.createElement("textarea"); ta.id = `s-${k}-${i}`; ta.rows = (k === "sub" && s.type === "list") || k === "cover" ? 3 : 2; ta.value = s[k] || "";
+      ta.oninput = () => { s[k] = ta.value; save(); }; ta.onfocus = () => { if (!playing) playT = Math.min(sceneStart(i) + Math.max(1.5, (s.dur || 2) * 0.7), totalDur()); };
+      f.append(sp, ta); el.append(f);
+    });
+    if (T.img) {
+      const f = document.createElement("div"); f.className = "row"; const sp = document.createElement("span"); sp.className = "hint"; sp.textContent = s.img ? "Immagine caricata." : "Carica la copertina o la foto del prodotto (PNG/JPG):";
+      const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.id = "s-img-" + i;
+      inp.onchange = () => readImage(inp.files[0], url => { s.img = url; save(); renderScenes(); });
+      f.append(sp, inp);
+      if (s.img) { const rm = document.createElement("button"); rm.className = "btn ghost"; rm.textContent = "Rimuovi immagine"; rm.onclick = () => { delete s.img; save(); renderScenes(); }; f.append(rm); }
+      el.append(f);
+    }
+    el.onclick = e => { if (e.target === el) playT = sceneStart(i) + 0.01; };
+    scenesEl.append(el);
+  });
+}
+function readImage(file, cb) {
+  if (!file) return; const fr = new FileReader();
+  fr.onload = () => { const im = new Image(); im.onload = () => { // ridimensiona per tenere leggero il progetto
+      const max = 1400; const s = Math.min(1, max / Math.max(im.width, im.height)); const c = document.createElement("canvas"); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s);
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); const url = file.type === "image/png" ? c.toDataURL("image/png") : c.toDataURL("image/jpeg", 0.9); img(url); cb(url); };
+    im.src = fr.result; };
+  fr.readAsDataURL(file);
+}
+document.getElementById("add-scene").onclick = () => { P.scenes.push({ type: "hook", text: "Nuova *scena*", sub: "", dur: 2.5 }); save(); renderScenes(); };
+document.getElementById("auto-dur").onclick = () => {
+  P.scenes.forEach(s => { const words = wordCount(s.text) + wordCount(s.sub); const lines = s.type === "list" ? String(s.sub || "").split("\n").filter(Boolean).length : 0;
+    s.dur = Math.round(clamp(1.4 + words * 0.28 + lines * 0.35 + (s.type === "product" ? 0.8 : 0), 2, 9) * 10) / 10; });
+  save(); renderScenes();
+};
+
+/* ================= Brand ================= */
+const bf = { name: "b-name", handle: "b-handle", c1: "b-c1", c2: "b-c2", accent: "b-accent", text: "b-text", font: "b-font", style: "b-style", hl: "b-hl", trans: "b-trans" };
+const bc = { upper: "b-upper", watermark: "b-watermark", progress: "b-progress" };
+function fillBrand() {
+  Object.entries(bf).forEach(([k, id]) => document.getElementById(id).value = P.brand[k] ?? "");
+  Object.entries(bc).forEach(([k, id]) => document.getElementById(id).checked = !!P.brand[k]);
+  const lp = document.getElementById("logo-prev"); lp.hidden = !P.brand.logo; if (P.brand.logo) lp.src = P.brand.logo;
+  const sel = document.getElementById("brand-list"); sel.textContent = "";
+  const o0 = document.createElement("option"); o0.value = ""; o0.textContent = brands.length ? "Brand salvati…" : "Nessun brand salvato"; sel.append(o0);
+  brands.forEach((b, i) => { const o = document.createElement("option"); o.value = i; o.textContent = b.name || "Senza nome"; sel.append(o); });
+}
+Object.entries(bf).forEach(([k, id]) => document.getElementById(id).addEventListener("input", e => { P.brand[k] = e.target.value; save(); if (k === "font") document.fonts.load(`${FONT_W[P.brand.font]} 60px "${P.brand.font}"`); }));
+Object.entries(bc).forEach(([k, id]) => document.getElementById(id).addEventListener("change", e => { P.brand[k] = e.target.checked; save(); }));
+document.getElementById("b-logo").onchange = e => readImage(e.target.files[0], url => { P.brand.logo = url; save(); fillBrand(); });
+document.getElementById("brand-save").onclick = () => {
+  const i = brands.findIndex(b => b.name === P.brand.name); if (i >= 0) brands[i] = structuredClone(P.brand); else brands.push(structuredClone(P.brand));
+  if (!store.set("fs_brands", brands)) { const lite = brands.map(b => ({ ...b, logo: null })); store.set("fs_brands", lite); }
+  fillBrand(); document.getElementById("brand-list").value = String(brands.findIndex(b => b.name === P.brand.name));
+};
+document.getElementById("brand-list").onchange = e => { const b = brands[+e.target.value]; if (b && e.target.value !== "") { P.brand = structuredClone(b); save(); fillBrand(); } };
+document.getElementById("brand-del").onclick = () => { const v = document.getElementById("brand-list").value; if (v === "") return; brands.splice(+v, 1); store.set("fs_brands", brands); fillBrand(); };
+
+/* ================= Audio UI ================= */
+function fillAudio() {
+  document.getElementById("a-beat").value = P.audio.beat; document.getElementById("a-vol").value = P.audio.vol; document.getElementById("a-whoosh").checked = P.audio.whoosh;
+  document.getElementById("a-file-wrap").hidden = P.audio.beat !== "file";
+}
+document.getElementById("a-beat").onchange = e => { P.audio.beat = e.target.value; save(); fillAudio(); };
+document.getElementById("a-vol").oninput = e => { P.audio.vol = +e.target.value; save(); };
+document.getElementById("a-whoosh").onchange = e => { P.audio.whoosh = e.target.checked; save(); };
+document.getElementById("a-file").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext; const oc = new OC(2, SR, SR); musicBuffer = await oc.decodeAudioData(await f.arrayBuffer()); audioCache = null; }
+  catch (err) { setStatus("Non riesco a leggere questo file audio. Usa MP3, M4A o WAV.", "err"); }
+};
+
+/* ================= Modelli, formato, didascalia ================= */
+function renderTemplates() {
+  const box = document.getElementById("templates"); box.textContent = "";
+  TEMPLATES.forEach(t => {
+    const b = document.createElement("button"); b.className = "tpl"; b.type = "button";
+    const sw = document.createElement("span"); sw.className = "sw"; [t.brand.c1, t.brand.c2, t.brand.accent].forEach(c => { const i = document.createElement("i"); i.style.background = c; sw.append(i); });
+    const n = document.createElement("b"); n.textContent = t.name; const d = document.createElement("span"); d.textContent = t.desc;
+    b.append(sw, n, d);
+    b.onclick = () => { const keepLogo = P.brand.logo; const fmt = P.format; P = fromTemplate(t); P.format = fmt; if (t.brand.name === "Irina B." && keepLogo) P.brand.logo = keepLogo; save(); syncAll(); playT = 0; };
+    box.append(b);
+  });
+}
+document.getElementById("format").onchange = e => { P.format = e.target.value; save(); sizePreview(); };
+document.getElementById("caption").oninput = e => { P.caption = e.target.value; save(); };
+document.getElementById("cap-copy").onclick = async () => {
+  const ta = document.getElementById("caption");
+  try { await navigator.clipboard.writeText(ta.value); document.getElementById("cap-copy").textContent = "Copiata"; setTimeout(() => document.getElementById("cap-copy").textContent = "Copia", 1500); }
+  catch (e) { ta.focus(); ta.select(); }
+};
+function syncAll() { document.getElementById("format").value = P.format; document.getElementById("caption").value = P.caption || ""; sizePreview(); fillBrand(); fillAudio(); renderScenes(); }
+
+/* ================= Script con l'AI ================= */
+(async () => {
+  if (!(window.claude && window.claude.use)) return;
+  const sample = await window.claude.use("sample").catch(() => null); if (!sample) return;
+  document.getElementById("ai-panel").hidden = false;
+  const st = document.getElementById("ai-status"); const go = document.getElementById("ai-go");
+  go.onclick = async () => {
+    go.disabled = true; st.className = "status"; st.textContent = "Scrivo lo script…";
+    const v = id => document.getElementById(id).value;
+    const prompt = `Sei un social media manager esperto di TikTok e Reels. Scrivi lo script di un video verticale di 15-22 secondi.
+Prodotto o servizio: ${v("ai-what")}
+Pubblico: ${v("ai-who")}
+Obiettivo: ${v("ai-goal")}
+Tono: ${v("ai-tone")}
+Lingua di TUTTI i testi: ${v("ai-lang")}
+
+Regole:
+- La prima scena è di tipo "hook": un gancio fortissimo di massimo 8 parole (domanda, errore comune, promessa) che fermi lo scroll.
+- 4-6 scene in tutto. L'ultima è di tipo "cta".
+- Testi brevi e leggibili su telefono: massimo 9 parole per "text", massimo 8 parole per "sub" (nell'elenco, massimo 6 parole per riga e 3-4 righe).
+- Racchiudi tra asterischi 1-3 parole chiave da evidenziare in ogni "text", es. "Inizia *oggi*".
+- Puoi usare al massimo un emoji per testo.
+- Non inventare numeri, statistiche o recensioni: usa una scena "stat" solo con numeri presenti nella descrizione del prodotto (es. il prezzo) e non usare scene "quote".
+- Tipi disponibili: hook (text, sub facoltativo), list (text = titolo, sub = punti separati da \\n), product (text = titolo, sub = didascalia, cover = titolo copertina breve su 2-3 righe separate da \\n), stat (text = numero con unità, sub = descrizione), cta (text = frase finale, sub = testo pulsante breve).
+- "dur" in secondi tra 2 e 6.
+Rispondi solo con JSON: {"scenes":[{"type":"hook","text":"...","sub":"...","dur":2.8}],"caption":"didascalia per TikTok con 4-7 hashtag in fondo"}`;
+    try {
+      const out = await sample.json(prompt, { modelTier: "default" });
+      const sc = (out && Array.isArray(out.scenes) ? out.scenes : []).filter(s => s && TYPES[s.type]).map(s => ({ type: s.type, text: String(s.text || ""), sub: String(s.sub || ""), cover: s.cover ? String(s.cover) : undefined, dur: clamp(+s.dur || 3, 1.5, 8) }));
+      if (!sc.length) throw { message: "risposta vuota" };
+      const oldImg = P.scenes.find(s => s.img)?.img; if (oldImg) { const p = sc.find(s => s.type === "product"); if (p) p.img = oldImg; }
+      P.scenes = sc; if (out.caption) P.caption = String(out.caption); save(); syncAll(); playT = 0;
+      st.className = "status ok"; st.textContent = "Fatto. Rivedi i testi e premi ▶.";
+    } catch (e) {
+      st.className = "status err";
+      st.textContent = e && e.code === "rate_limited" ? "Troppe richieste ravvicinate: riprova tra un minuto." : e && e.code === "not_granted" ? "Permesso negato: puoi scrivere le scene a mano." : "Non sono riuscito a generare lo script. Riprova.";
+      if (e && e.code === "not_granted") document.getElementById("ai-panel").hidden = true;
+    }
+    go.disabled = false;
+  };
+})();
+
+/* ================= Avvio ================= */
+renderTemplates(); syncAll();
+document.fonts.ready.then(() => { partCache.key = ""; });
+requestAnimationFrame(ts => { lastTs = ts; loop(ts); });
+</script>
