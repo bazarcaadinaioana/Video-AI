@@ -3,6 +3,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=JetBrains+Mono:wght@500&family=Manrope:wght@400;600;700&family=Montserrat:wght@700;800;900&family=Playfair+Display:wght@700;800&family=Poppins:wght@600;700;800&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.js"></script>
+<script src="lib/personaggi.js"></script>
 <style>
 /* Layout: editor a sinistra, monitor di anteprima fisso a destra; su telefono il monitor va in alto. Tema scuro unico, voluto (sala di montaggio). */
 :root {
@@ -192,6 +193,34 @@ details summary { cursor: pointer; font-weight: 700; }
       </div>
     </div>
 
+    <div class="panel" id="voice-panel">
+      <div class="panel-head"><h2>Voce e personaggio parlante</h2><span class="eyebrow">Gratis · funziona nel tuo browser</span></div>
+      <div class="grid">
+        <label class="field"><span>Personaggio</span><select id="v-char">
+          <option value="none">Nessuno (solo voce)</option><option value="libro">Il libro parlante</option><option value="robot">Bit, il robot</option><option value="tazza">La tazzina</option><option value="immagine">La mia immagine</option></select></label>
+        <label class="field" id="v-title-wrap"><span>Scritta sul libro</span><input type="text" id="v-title" maxlength="14"></label>
+        <label class="field"><span>Voce</span><select id="v-voice"></select></label>
+        <label class="field"><span>Tono della voce</span><input type="range" id="v-pitch" min="0.85" max="1.5" step="0.05"></label>
+        <label class="field"><span>Velocità</span><input type="range" id="v-speed" min="0.8" max="1.3" step="0.05"></label>
+      </div>
+      <div id="v-img-wrap" class="grid" hidden>
+        <div class="field" style="grid-column:1/-1"><span>Immagine del personaggio (PNG con sfondo trasparente è l'ideale)</span><input type="file" id="v-img" accept="image/*"></div>
+        <label class="field"><span>Bocca: orizzontale</span><input type="range" id="v-mx" min="0" max="1" step="0.01"></label>
+        <label class="field"><span>Bocca: verticale</span><input type="range" id="v-my" min="0" max="1" step="0.01"></label>
+        <label class="field"><span>Bocca: grandezza</span><input type="range" id="v-ms" min="0.05" max="0.4" step="0.01"></label>
+        <p class="hint" style="grid-column:1/-1">Puoi creare il personaggio gratis con ChatGPT o Gemini, per esempio: <code>personaggio simpatico in stile cartone 3D, una bambina con gli occhiali che tiene un libro, a figura intera, sfondo trasparente, bocca chiusa</code>. Poi sposta i cursori finché la bocca animata copre la sua bocca.</p>
+      </div>
+      <label class="check"><input type="checkbox" id="v-captions"> Sottotitoli di ciò che dice (nel fumetto)</label>
+      <div class="row">
+        <button class="btn primary" id="v-gen">Genera la voce</button>
+        <label class="btn" for="v-upload" style="cursor:pointer">Usa la mia voce registrata</label><input type="file" id="v-upload" accept="audio/*" hidden>
+        <button class="btn ghost" id="v-clear">Togli la voce</button>
+      </div>
+      <div class="bar"><i id="v-bar"></i></div>
+      <div class="status" id="v-status">Scrivi il testo parlato nel campo "Cosa dice la voce" di ogni scena, poi premi "Genera la voce".</div>
+      <p class="hint">Le voci sono modelli neurali open source che girano sul tuo telefono o computer: niente crediti e niente abbonamenti. La prima volta il browser scarica la voce scelta (60-80 MB, meglio con il Wi-Fi), poi resta salvata. La durata di ogni scena si adatta da sola a ciò che dice la voce.</p>
+    </div>
+
     <div class="panel">
       <div class="panel-head"><h2>Audio</h2></div>
       <div class="grid">
@@ -244,28 +273,30 @@ const TYPES = {
 };
 
 const TEMPLATES = [
-  { id: "ebook-it", name: "Ebook AI · Italiano", desc: "Promo del tuo ebook per TikTok",
-    brand: { name: "Irina B.", handle: "@irinabook.ai", c1: "#100a2b", c2: "#3a1c78", accent: "#ffc83d", text: "#ffffff", font: "Montserrat", style: "stelle", hl: "colore", trans: "zoom", upper: false, watermark: true, progress: true },
+  { id: "ebook-it", name: "Ebook AI · Italiano", desc: "Il libro parlante presenta il tuo ebook",
+    brand: { name: "Irina B.", handle: "@irinabook.ai", c1: "#050d24", c2: "#0d3b8c", accent: "#ffc21a", text: "#ffffff", font: "Montserrat", style: "aurora", hl: "colore", trans: "zoom", upper: false, watermark: true, progress: true },
+    voice: { char: "libro", voice: "it-paola", title: "AI", pitch: 1.1, speed: 1.05 },
     scenes: [
-      { type: "hook", text: "Usi ancora l'AI *solo per chattare?*", sub: "🤖 Ti stai perdendo il meglio", dur: 2.8 },
-      { type: "list", text: "Con l'AI puoi:", sub: "✍️ Scrivere testi in pochi secondi\n🎨 Creare immagini e loghi\n🎬 Fare video per i social\n⏱️ Risparmiare ore ogni settimana", dur: 5.5 },
-      { type: "product", text: "La guida *per principianti*", sub: "Spiegata semplice, passo dopo passo", cover: "INTELLIGENZA\nARTIFICIALE\nPER PRINCIPIANTI", dur: 3.6 },
-      { type: "stat", text: "5€", sub: "Meno di un caffè e un cornetto ☕", dur: 3 },
-      { type: "cta", text: "Inizia *oggi* 👇", sub: "Link in bio", dur: 3 },
+      { type: "hook", text: "Usi l'AI *solo per chattare?*", sub: "Ti stai perdendo il meglio", say: "Ciao! Usi ancora l'intelligenza artificiale solo per chattare? Allora ti stai perdendo il meglio.", dur: 5 },
+      { type: "list", text: "Con l'AI puoi:", sub: "Scrivere testi in pochi secondi\nCreare immagini e loghi\nFare video per i social\nRisparmiare ore ogni settimana", say: "Con l'intelligenza artificiale puoi scrivere testi in pochi secondi, creare immagini e loghi, fare video per i social, e risparmiare ore ogni settimana.", dur: 8 },
+      { type: "product", text: "La guida *per principianti*", sub: "Spiegata semplice, passo dopo passo", cover: "INTELLIGENZA\nARTIFICIALE\nPER PRINCIPIANTI", say: "Nella guida per principianti ti spiego tutto in modo semplice, passo dopo passo, con sessanta prompt pronti da copiare.", dur: 6.5 },
+      { type: "stat", text: "5€", sub: "Meno di un caffè e un cornetto", say: "E costa solo cinque euro. Meno di un caffè e un cornetto!", dur: 4 },
+      { type: "cta", text: "Inizia *oggi*", sub: "Link in bio", say: "Inizia oggi: trovi il link nella mia bio!", dur: 3.5 },
     ],
     caption: "Vuoi iniziare con l'intelligenza artificiale ma non sai da dove partire? 📚 La mia guida per principianti ti spiega tutto in modo semplice, passo dopo passo. Link in bio 👆\n\n#intelligenzaartificiale #ai #chatgpt #imparaconTikTok #ebook #principianti #tecnologia",
-    beat: "pulse" },
-  { id: "ebook-en", name: "AI Ebook · English", desc: "The same promo for the English ebook",
-    brand: { name: "Irina B.", handle: "@irinabook.ai", c1: "#100a2b", c2: "#3a1c78", accent: "#ffc83d", text: "#ffffff", font: "Montserrat", style: "stelle", hl: "colore", trans: "zoom", upper: false, watermark: true, progress: true },
+    beat: "lofi" },
+  { id: "ebook-en", name: "AI Ebook · English", desc: "The talking book presents your ebook",
+    brand: { name: "Irina B.", handle: "@irinabook.ai", c1: "#050d24", c2: "#0d3b8c", accent: "#ffc21a", text: "#ffffff", font: "Montserrat", style: "aurora", hl: "colore", trans: "zoom", upper: false, watermark: true, progress: true },
+    voice: { char: "libro", voice: "en-female", title: "AI", pitch: 1.1, speed: 1.05 },
     scenes: [
-      { type: "hook", text: "Still using AI *just to chat?*", sub: "🤖 You're missing the best part", dur: 2.8 },
-      { type: "list", text: "With AI you can:", sub: "✍️ Write copy in seconds\n🎨 Create images and logos\n🎬 Make videos for social media\n⏱️ Save hours every week", dur: 5.5 },
-      { type: "product", text: "The *beginner's* guide", sub: "Simple, step by step", cover: "ARTIFICIAL\nINTELLIGENCE\nFOR BEGINNERS", dur: 3.6 },
-      { type: "stat", text: "5€", sub: "Less than a coffee and a croissant ☕", dur: 3 },
-      { type: "cta", text: "Start *today* 👇", sub: "Link in bio", dur: 3 },
+      { type: "hook", text: "Still using AI *just to chat?*", sub: "You're missing the best part", say: "Hi! Are you still using artificial intelligence just to chat? Then you're missing the best part.", dur: 5 },
+      { type: "list", text: "With AI you can:", sub: "Write copy in seconds\nCreate images and logos\nMake videos for social media\nSave hours every week", say: "With artificial intelligence you can write copy in seconds, create images and logos, make videos for social media, and save hours every week.", dur: 8 },
+      { type: "product", text: "The *beginner's* guide", sub: "Simple, step by step", cover: "ARTIFICIAL\nINTELLIGENCE\nFOR BEGINNERS", say: "My beginner's guide explains everything simply, step by step, with sixty ready-to-copy prompts.", dur: 6.5 },
+      { type: "stat", text: "5€", sub: "Less than a coffee and a croissant", say: "And it's only five euros. Less than a coffee and a croissant!", dur: 4 },
+      { type: "cta", text: "Start *today*", sub: "Link in bio", say: "Start today: the link is in my bio!", dur: 3.5 },
     ],
     caption: "Want to start with AI but don't know where to begin? 📚 My beginner's guide explains everything step by step. Link in bio 👆\n\n#artificialintelligence #ai #chatgpt #learnontiktok #ebook #beginners #tech",
-    beat: "pulse" },
+    beat: "lofi" },
   { id: "shop", name: "Negozio · prodotto", desc: "Esempio: candele artigianali",
     brand: { name: "Bottega Luce", handle: "@bottegaluce", c1: "#1c120d", c2: "#5b2c18", accent: "#ffb46b", text: "#fff6ec", font: "Playfair Display", style: "aurora", hl: "colore", trans: "fade", upper: false, watermark: true, progress: false },
     scenes: [
@@ -293,11 +324,13 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
 };
+const VOICE_DEF = { char: "none", voice: "it-paola", title: "AI", pitch: 1, speed: 1, captions: true, mx: 0.5, my: 0.62, ms: 0.16, img: null };
 function fromTemplate(t) {
   return { format: "9:16", brand: structuredClone(t.brand), scenes: structuredClone(t.scenes), caption: t.caption,
-    audio: { beat: t.beat || "pulse", vol: 0.6, whoosh: true } };
+    audio: { beat: t.beat || "pulse", vol: 0.6, whoosh: true }, voice: { ...VOICE_DEF, ...(t.voice || {}) } };
 }
-let P = store.get("fs_project", null) || fromTemplate(TEMPLATES[0]);
+let P = store.get("fs_project2", null) || fromTemplate(TEMPLATES[0]);
+P.voice = { ...VOICE_DEF, ...(P.voice || {}) };
 let brands = store.get("fs_brands", []);
 let musicBuffer = null;
 const images = new Map(); // dataURL -> HTMLImageElement
@@ -312,12 +345,12 @@ let saveTimer = 0;
 function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    if (!store.set("fs_project", P)) {
-      const lite = structuredClone(P); lite.scenes.forEach(s => delete s.img); lite.brand.logo = null;
-      store.set("fs_project", lite);
+    if (!store.set("fs_project2", P)) {
+      const lite = structuredClone(P); lite.scenes.forEach(s => delete s.img); lite.brand.logo = null; lite.voice.img = null;
+      store.set("fs_project2", lite);
     }
   }, 300);
-  audioCache = null;
+  audioCache = null; voiceTrack = null;
 }
 
 /* ================= Utilità ================= */
@@ -450,8 +483,8 @@ function star4(ctx, x, y, r) { ctx.beginPath(); ctx.moveTo(x, y - r); ctx.quadra
 
 /* ================= Scene ================= */
 function zone(W, H) {
-  const tall = H / W > 1.5;
-  return { top: tall ? H * 0.15 : H * 0.09, bottom: tall ? H * 0.76 : H * 0.9, maxW: W * (W > H ? 0.78 : 0.84), u: Math.min(W, H) / 1080 };
+  const tall = H / W > 1.5, ch = P.voice.char !== "none";
+  return { top: tall ? H * 0.15 : H * 0.09, bottom: ch ? H * (tall ? 0.55 : 0.6) : (tall ? H * 0.76 : H * 0.9), maxW: W * (W > H ? 0.78 : 0.84), u: Math.min(W, H) / 1080 };
 }
 function drawScene(ctx, W, H, sc, lt, dur, B) {
   const Z = zone(W, H), u = Z.u, cx = W / 2, zh = Z.bottom - Z.top, fam = B.font, up = B.upper;
@@ -624,6 +657,7 @@ function renderFrame(ctx, W, H, t, opts = {}) {
   else if (B.trans === "slide") { ctx.translate((1 - ein) * W * 0.35 - eout * W * 0.35, 0); }
   drawScene(ctx, W, H, cur.s, cur.local, cur.dur, B);
   ctx.restore();
+  drawTalker(ctx, W, H, t, B);
   // marchio
   if (B.watermark) {
     const tall = H / W > 1.5; const y = tall ? H * 0.105 : H * 0.05; const lg = img(B.logo); const r = 30 * u;
@@ -638,6 +672,105 @@ function renderFrame(ctx, W, H, t, opts = {}) {
     ctx.fillStyle = "rgba(255,40,80,0.28)"; ctx.fillRect(0, 0, W, H * 0.065); ctx.fillRect(0, H * 0.8, W, H * 0.2); ctx.fillRect(W * 0.86, H * 0.42, W * 0.14, H * 0.38);
     setFont(ctx, 26 * u, "Montserrat", 700); ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.fillText("Didascalia e nome utente di TikTok", W / 2, H * 0.9);
   }
+}
+
+/* ================= Voce e personaggio parlante ================= */
+const VOICE_LIST = { "it-paola": "Paola · italiano (donna)", "it-riccardo": "Riccardo · italiano (uomo)", "en-female": "Hannah · English (woman)", "en-male": "Ryan · English (man)", "ro-mihai": "Mihai · română (bărbat)", "es-davefx": "Dave · español (hombre)" };
+const voiceClips = new Map();      // indice scena -> { key, samples (a SR), dur, speakStart, speakEnd }
+let uploadedVoice = null;          // Float32Array a SR, per la voce registrata dall'utente
+let voiceTrack = null;             // { samples, lip, words, key }
+let voceMod = null;
+function cleanSay(s) {
+  const raw = (s.say && s.say.trim()) || [s.text, s.type === "hook" || s.type === "cta" ? s.sub : ""].filter(Boolean).join(". ");
+  return raw.replace(/\*/g, "").replace(/[\p{Extended_Pictographic}️‍]/gu, "").replace(/\s+/g, " ").trim();
+}
+function resample(src, from, to) {
+  if (from === to) return src; const n = Math.floor(src.length * to / from), out = new Float32Array(n), k = from / to;
+  for (let i = 0; i < n; i++) { const x = i * k, j = Math.floor(x), f = x - j; out[i] = (src[j] || 0) * (1 - f) + (src[j + 1] || 0) * f; }
+  return out;
+}
+function speechSpan(samples) { // primo e ultimo istante in cui la voce è udibile
+  let a = 0, b = samples.length - 1; const th = 0.02;
+  while (a < b && Math.abs(samples[a]) < th) a++; while (b > a && Math.abs(samples[b]) < th) b--;
+  return [a / SR, b / SR];
+}
+const LEAD = 0.25; // secondi di attesa all'inizio di ogni scena prima di parlare
+function ensureVoiceTrack() {
+  const D = totalDur(); const key = P.scenes.map(s => s.dur).join(",") + "|" + (uploadedVoice ? "u" + uploadedVoice.length : [...voiceClips.values()].map(c => c.key).join("§"));
+  if (voiceTrack && voiceTrack.key === key) return voiceTrack;
+  if (!uploadedVoice && !voiceClips.size) { voiceTrack = null; return null; }
+  const N = Math.ceil(D * SR), track = new Float32Array(N), words = [];
+  if (uploadedVoice) track.set(uploadedVoice.subarray(0, N));
+  else {
+    let acc = 0;
+    P.scenes.forEach((s, i) => {
+      const c = voiceClips.get(i); const st = acc + LEAD; acc += +s.dur || 0;
+      if (!c || c.key !== clipKey(s)) return;
+      const off = Math.floor(st * SR); track.set(c.samples.subarray(0, Math.max(0, Math.min(c.samples.length, N - off))), off);
+      // tempi delle parole, proporzionali alla lunghezza (con pausa dopo la punteggiatura)
+      const ws = cleanSay(s).split(" ").filter(Boolean); const weight = w => w.replace(/[^\p{L}\p{N}]/gu, "").length + 2 + (/[.,!?;:]$/.test(w) ? 4 : 0);
+      const tot = ws.reduce((a, w) => a + weight(w), 0) || 1; let t0 = st + c.speakStart; const span = c.speakEnd - c.speakStart;
+      ws.forEach(w => { const d = span * weight(w) / tot; words.push({ w, t0, t1: t0 + d, scene: i }); t0 += d; });
+    });
+  }
+  const lip = window.Personaggi ? Personaggi.lipsync(track, SR, FPS) : [];
+  voiceTrack = { samples: track, lip, words, key }; return voiceTrack;
+}
+function clipKey(s) { const V = P.voice; return [V.voice, V.pitch, V.speed, cleanSay(s)].join("|"); }
+function setVStatus(msg, cls = "") { const el = document.getElementById("v-status"); el.textContent = msg; el.className = "status " + cls; }
+async function generateVoices() {
+  const btn = document.getElementById("v-gen"); btn.disabled = true; const bar = document.getElementById("v-bar");
+  try {
+    setVStatus("Preparo il motore della voce…");
+    voceMod = voceMod || await import("./lib/voce.js");
+    uploadedVoice = null; const V = P.voice; let done = 0;
+    for (let i = 0; i < P.scenes.length; i++) {
+      const s = P.scenes[i]; const text = cleanSay(s); const k = clipKey(s);
+      if (!text) { voiceClips.delete(i); continue; }
+      const old = voiceClips.get(i); if (old && old.key === k) { done++; continue; }
+      setVStatus(`Genero la voce della scena ${i + 1} di ${P.scenes.length}…`);
+      const r = await voceMod.speak(text, { voice: V.voice, pitch: +V.pitch, speed: +V.speed, onProgress: (got, tot) => { bar.style.width = (tot ? got / tot * 100 : 50).toFixed(0) + "%"; setVStatus(`Scarico la voce (solo la prima volta): ${(got / 1048576).toFixed(0)}${tot ? " di " + (tot / 1048576).toFixed(0) : ""} MB`); } });
+      const samples = resample(r.samples, r.sampleRate, SR); const [a, b] = speechSpan(samples);
+      voiceClips.set(i, { key: k, samples, dur: samples.length / SR, speakStart: a, speakEnd: b });
+      s.dur = Math.round(Math.max(2.2, samples.length / SR + LEAD + 0.45) * 10) / 10;
+      done++; bar.style.width = (done / P.scenes.length * 100).toFixed(0) + "%";
+    }
+    // le scene senza testo parlato perdono la voce vecchia
+    [...voiceClips.keys()].forEach(i => { if (i >= P.scenes.length) voiceClips.delete(i); });
+    save(); renderScenes(); audioCache = null; voiceTrack = null; ensureVoiceTrack();
+    bar.style.width = "100%"; setVStatus(`Voce pronta: ${fmtTime(totalDur())} di video. Premi ▶ per ascoltare.`, "ok");
+    playT = 0;
+  } catch (e) {
+    console.error(e);
+    const blocked = /fetch|network|Failed|import|load/i.test(String(e && e.message || e));
+    setVStatus(blocked ? "Questa pagina non può scaricare il motore della voce (succede dentro l'anteprima di claude.ai). Apri Fotogramma Studio dal suo indirizzo web oppure usa \"Usa la mia voce registrata\"." : "Non sono riuscito a generare la voce: " + (e && e.message || e), "err");
+  }
+  btn.disabled = false;
+}
+function drawTalker(ctx, W, H, t, B) {
+  const V = P.voice; const vt = ensureVoiceTrack(); const tall = H / W > 1.5; const u = Math.min(W, H) / 1080;
+  const lip = vt && vt.lip.length ? vt.lip[Math.min(vt.lip.length - 1, Math.floor(t * FPS))] : null;
+  let cx, cy, s;
+  if (tall) { cx = W * 0.25; cy = H * 0.665; s = W * 0.33; } else { cx = W * (W > H ? 0.12 : 0.2); cy = H * 0.8; s = H * (W > H ? 0.2 : 0.2); }
+  if (V.char !== "none" && window.Personaggi) {
+    const wave = t < 1.6 ? Math.sin(clamp(t / 1.6) * Math.PI) : 0;
+    Personaggi.draw(ctx, V.char, cx, cy, s, t, lip, B, { wave, title: V.title, img: img(V.img), cfg: V });
+  }
+  if (!V.captions || !vt || !vt.words.length) return;
+  const cur = vt.words.findIndex(w => t >= w.t0 && t < w.t1 + 0.05); if (cur < 0) return;
+  // gruppo di parole (max 4) che contiene la parola corrente
+  const g0 = cur - ((cur - vt.words.findIndex(w => w.scene === vt.words[cur].scene)) % 4); const grp = vt.words.slice(g0, g0 + 4).filter(w => w.scene === vt.words[cur].scene);
+  const px = 52 * u; setFont(ctx, px, "Montserrat", 800);
+  const text = grp.map(w => w.w); const sp = ctx.measureText(" ").width; const widths = text.map(w => ctx.measureText(w).width);
+  const bubbleX = V.char === "none" ? W * 0.08 : (tall ? W * 0.47 : cx + s * 0.75), bubbleW = V.char === "none" ? W * 0.84 : (tall ? W * 0.42 : W * 0.4);
+  const lines = []; let line = [], lw = 0; text.forEach((w, i) => { const add = (line.length ? sp : 0) + widths[i]; if (line.length && lw + add > bubbleW - 50 * u) { lines.push({ line, lw }); line = []; lw = 0; } line.push(i); lw += line.length > 1 ? sp + widths[i] : widths[i]; }); if (line.length) lines.push({ line, lw });
+  const lh = px * 1.2, bh = lines.length * lh + 40 * u; const by = V.char === "none" ? H * (tall ? 0.7 : 0.8) - bh / 2 : (tall ? H * 0.585 : cy - s * 0.4) - bh / 2;
+  ctx.save(); ctx.fillStyle = "rgba(255,255,255,0.96)"; ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 24 * u;
+  rr(ctx, bubbleX, by, bubbleW, bh, 28 * u); ctx.fill();
+  if (V.char !== "none") { ctx.beginPath(); ctx.moveTo(bubbleX + 4 * u, by + bh * 0.55); ctx.lineTo(bubbleX - 34 * u, by + bh * 0.85); ctx.lineTo(bubbleX + 4 * u, by + bh * 0.85); ctx.fill(); }
+  ctx.shadowColor = "transparent"; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+  lines.forEach((L, li) => { let x = bubbleX + (bubbleW - L.lw) / 2; const y = by + 20 * u + li * lh + lh / 2; L.line.forEach(i => { const w = grp[i]; const on = g0 + i === cur; ctx.fillStyle = on ? (lum(B.accent) > 0.75 ? "#c78a00" : B.accent) : (g0 + i < cur ? "#1b2440" : "#6b7590"); ctx.fillText(text[i], x, y); x += widths[i] + sp; }); });
+  ctx.restore();
 }
 
 /* ================= Anteprima ================= */
@@ -676,13 +809,15 @@ const SR = 48000;
 async function getMix() {
   const D = totalDur();
   if (audioCache) return audioCache;
-  const A = P.audio; if (A.beat === "none" && !A.whoosh) return null;
-  if (A.beat === "file" && !musicBuffer && !A.whoosh) return null;
+  const A = P.audio; const vt = ensureVoiceTrack();
+  if (!vt && A.beat === "none" && !A.whoosh) return null;
+  if (!vt && A.beat === "file" && !musicBuffer && !A.whoosh) return null;
   const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
   const oc = new OC(2, Math.ceil(SR * D), SR);
   const master = oc.createGain(); master.connect(oc.destination);
   const music = oc.createGain(); music.gain.value = 0; music.connect(master);
-  const vol = +A.vol; music.gain.setValueAtTime(0, 0); music.gain.linearRampToValueAtTime(vol, 0.4);
+  const vol = +A.vol * (vt ? 0.3 : 1); music.gain.setValueAtTime(0, 0);
+  if (vt) { const vb = oc.createBuffer(1, vt.samples.length, SR); vb.copyToChannel(vt.samples, 0); const vs = oc.createBufferSource(); vs.buffer = vb; const vg = oc.createGain(); vg.gain.value = 0.95; vs.connect(vg); vg.connect(master); vs.start(0); } music.gain.linearRampToValueAtTime(vol, 0.4);
   music.gain.setValueAtTime(vol, Math.max(0.5, D - 1.2)); music.gain.linearRampToValueAtTime(0, D);
   const noise = oc.createBuffer(1, SR, SR); const nd = noise.getChannelData(0); const r = rng(11); for (let i = 0; i < SR; i++) nd[i] = r() * 2 - 1;
   if (A.beat === "file" && musicBuffer) { const s = oc.createBufferSource(); s.buffer = musicBuffer; s.loop = true; s.connect(music); s.start(0); }
@@ -845,7 +980,7 @@ function renderScenes() {
       mk("▶", "Vai a questa scena", () => { playT = sceneStart(i) + 0.01; }));
     el.append(head);
     const T = TYPES[s.type] || TYPES.hook;
-    Object.entries(T.f).forEach(([k, label]) => {
+    Object.entries({ ...T.f, say: "Cosa dice la voce (se vuoto legge il testo principale)" }).forEach(([k, label]) => {
       const f = document.createElement("label"); f.className = "field"; const sp = document.createElement("span"); sp.textContent = label;
       const ta = document.createElement("textarea"); ta.id = `s-${k}-${i}`; ta.rows = (k === "sub" && s.type === "list") || k === "cover" ? 3 : 2; ta.value = s[k] || "";
       ta.oninput = () => { s[k] = ta.value; save(); }; ta.onfocus = () => { if (!playing) playT = Math.min(sceneStart(i) + Math.max(1.5, (s.dur || 2) * 0.7), totalDur()); };
@@ -933,7 +1068,37 @@ document.getElementById("cap-copy").onclick = async () => {
   try { await navigator.clipboard.writeText(ta.value); document.getElementById("cap-copy").textContent = "Copiata"; setTimeout(() => document.getElementById("cap-copy").textContent = "Copia", 1500); }
   catch (e) { ta.focus(); ta.select(); }
 };
-function syncAll() { document.getElementById("format").value = P.format; document.getElementById("caption").value = P.caption || ""; sizePreview(); fillBrand(); fillAudio(); renderScenes(); }
+function syncAll() { document.getElementById("format").value = P.format; document.getElementById("caption").value = P.caption || ""; sizePreview(); fillBrand(); fillAudio(); fillVoice(); renderScenes(); }
+
+/* ================= Voce: controlli ================= */
+(function () {
+  const sel = document.getElementById("v-voice");
+  Object.entries(VOICE_LIST).forEach(([k, v]) => { const o = document.createElement("option"); o.value = k; o.textContent = v; sel.append(o); });
+})();
+function fillVoice() {
+  const V = P.voice;
+  document.getElementById("v-char").value = V.char; document.getElementById("v-voice").value = V.voice; document.getElementById("v-title").value = V.title || "";
+  document.getElementById("v-pitch").value = V.pitch; document.getElementById("v-speed").value = V.speed; document.getElementById("v-captions").checked = !!V.captions;
+  document.getElementById("v-mx").value = V.mx; document.getElementById("v-my").value = V.my; document.getElementById("v-ms").value = V.ms;
+  document.getElementById("v-img-wrap").hidden = V.char !== "immagine"; document.getElementById("v-title-wrap").hidden = V.char !== "libro";
+}
+[["v-char", "char"], ["v-voice", "voice"], ["v-title", "title"], ["v-pitch", "pitch", true], ["v-speed", "speed", true], ["v-mx", "mx", true], ["v-my", "my", true], ["v-ms", "ms", true]].forEach(([id, k, num]) =>
+  document.getElementById(id).addEventListener("input", e => { P.voice[k] = num ? +e.target.value : e.target.value; save(); fillVoice(); if (["voice", "pitch", "speed"].includes(k) && voiceClips.size) setVStatus("Hai cambiato la voce: premi \"Genera la voce\" per rigenerarla."); }));
+document.getElementById("v-captions").onchange = e => { P.voice.captions = e.target.checked; save(); };
+document.getElementById("v-img").onchange = e => readImage(e.target.files[0], url => { P.voice.img = url; save(); });
+document.getElementById("v-gen").onclick = generateVoices;
+document.getElementById("v-clear").onclick = () => { voiceClips.clear(); uploadedVoice = null; voiceTrack = null; audioCache = null; document.getElementById("v-bar").style.width = "0%"; setVStatus("Voce tolta."); };
+document.getElementById("v-upload").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext; const buf = await new OC(1, SR, SR).decodeAudioData(await f.arrayBuffer());
+    const ch = buf.getChannelData(0); uploadedVoice = new Float32Array(ch); voiceClips.clear();
+    const need = buf.duration + 0.4; const D = totalDur();
+    if (need > D) { P.scenes[P.scenes.length - 1].dur = Math.round((+P.scenes[P.scenes.length - 1].dur + need - D) * 10) / 10; }
+    save(); renderScenes(); voiceTrack = null; audioCache = null; ensureVoiceTrack();
+    setVStatus(`Voce caricata (${fmtTime(buf.duration)}). Il personaggio muove la bocca a tempo. Regola le durate delle scene se serve.`, "ok");
+  } catch (err) { setVStatus("Non riesco a leggere questo file audio. Usa M4A, MP3 o WAV.", "err"); }
+};
 
 /* ================= Script con l'AI ================= */
 (async () => {
@@ -960,10 +1125,11 @@ Regole:
 - Non inventare numeri, statistiche o recensioni: usa una scena "stat" solo con numeri presenti nella descrizione del prodotto (es. il prezzo) e non usare scene "quote".
 - Tipi disponibili: hook (text, sub facoltativo), list (text = titolo, sub = punti separati da \\n), product (text = titolo, sub = didascalia, cover = titolo copertina breve su 2-3 righe separate da \\n), stat (text = numero con unità, sub = descrizione), cta (text = frase finale, sub = testo pulsante breve).
 - "dur" in secondi tra 2 e 6.
-Rispondi solo con JSON: {"scenes":[{"type":"hook","text":"...","sub":"...","dur":2.8}],"caption":"didascalia per TikTok con 4-7 hashtag in fondo"}`;
+- Per ogni scena scrivi anche "say": la frase che dice la voce narrante (naturale, parlata, 8-25 parole, senza emoji e senza asterischi; scrivi i numeri in lettere).
+Rispondi solo con JSON: {"scenes":[{"type":"hook","text":"...","sub":"...","say":"...","dur":2.8}],"caption":"didascalia per TikTok con 4-7 hashtag in fondo"}`;
     try {
       const out = await sample.json(prompt, { modelTier: "default" });
-      const sc = (out && Array.isArray(out.scenes) ? out.scenes : []).filter(s => s && TYPES[s.type]).map(s => ({ type: s.type, text: String(s.text || ""), sub: String(s.sub || ""), cover: s.cover ? String(s.cover) : undefined, dur: clamp(+s.dur || 3, 1.5, 8) }));
+      const sc = (out && Array.isArray(out.scenes) ? out.scenes : []).filter(s => s && TYPES[s.type]).map(s => ({ type: s.type, text: String(s.text || ""), sub: String(s.sub || ""), cover: s.cover ? String(s.cover) : undefined, say: s.say ? String(s.say) : "", dur: clamp(+s.dur || 3, 1.5, 8) }));
       if (!sc.length) throw { message: "risposta vuota" };
       const oldImg = P.scenes.find(s => s.img)?.img; if (oldImg) { const p = sc.find(s => s.type === "product"); if (p) p.img = oldImg; }
       P.scenes = sc; if (out.caption) P.caption = String(out.caption); save(); syncAll(); playT = 0;
