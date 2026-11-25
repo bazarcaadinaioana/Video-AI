@@ -1,2 +1,3 @@
 ebooks/
 studio/.cache/
+__pycache__/
