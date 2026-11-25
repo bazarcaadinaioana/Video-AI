@@ -132,8 +132,8 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Cap,{font},104,{txt},{acc},&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,8,4,5,60,60,0,1
-Style: Hook,Montserrat Black,96,&H00111111,{acc},{acc},&H00000000,0,0,0,0,100,100,0,0,3,26,0,5,80,80,0,1
+Style: Cap,{font},{project.get("caption_size", 104)},{txt},{acc},&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,8,4,5,60,60,0,1
+Style: Hook,Montserrat Black,{project.get("hook_size", 96)},&H00111111,{acc},{acc},&H00000000,0,0,0,0,100,100,0,0,3,26,0,5,80,80,0,1
 Style: Small,{font},40,{txt},{acc},&H00000000,&H64000000,0,0,0,0,100,100,1,0,1,3,2,5,60,60,0,1
 Style: CTA,Montserrat Black,78,&H00111111,{acc},{acc},&H00000000,0,0,0,0,100,100,0,0,3,30,0,5,80,80,0,1
 
@@ -141,7 +141,7 @@ Style: CTA,Montserrat Black,78,&H00111111,{acc},{acc},&H00000000,0,0,0,0,100,100
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     ev = []
-    cap_y = int(H * project.get("caption_y", 0.64))
+    cap_y = int(H * project.get("caption_y", 0.57 if project.get("mascot") else 0.64))
     # sottotitoli parola per parola, a gruppi di max 3 parole
     for sc in timeline:
         words = sc["words"]
@@ -149,7 +149,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             continue
         groups, cur = [], []
         for w in words:
-            if cur and (len(" ".join(x[2] for x in cur + [w])) > 15 or len(cur) >= 3):
+            if cur and (len(" ".join(x[2] for x in cur + [w])) > project.get("caption_chars", 15) or len(cur) >= project.get("caption_words", 3)):
                 groups.append(cur); cur = []
             cur.append(w)
             if re.search(r"[.,!?;:]$", w[2]):
@@ -170,19 +170,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         parts.append(word)
                 pop = r"{\fscx70\fscy70\t(0,90,\fscx100\fscy100)}" if i == 0 else ""
                 y = int(H * sc["caption_y"]) if sc.get("caption_y") else cap_y
-                ev.append(f"Dialogue: 1,{ass_time(sc['t0'] + st)},{ass_time(sc['t0'] + en)},Cap,,0,0,0,,{{\\pos({W // 2},{y})}}{pop}{' '.join(parts)}")
+                ev.append(f"Dialogue: 1,{ass_time(sc['t0'] + st)},{ass_time(sc['t0'] + en)},Cap,,0,0,0,,{{\\pos({int(W * project.get("caption_x", 0.5))},{y})}}{pop}{' '.join(parts)}")
     # gancio in alto nei primi secondi
     hook = project.get("hook_text")
     if hook:
         end = min(timeline[0]["t1"], 3.6)
         lines = ass_escape(hook.upper()).replace("\n", "\\N")
-        ev.append(f"Dialogue: 2,{ass_time(0.05)},{ass_time(end)},Hook,,0,0,0,,{{\\pos({W // 2},{int(H * 0.25)})\\fscx60\\fscy60\\t(0,160,\\fscx100\\fscy100)\\fad(0,200)}}{lines}")
+        ev.append(f"Dialogue: 2,{ass_time(0.05)},{ass_time(end)},Hook,,0,0,0,,{{\\pos({W // 2},{int(H * project.get("hook_y", 0.25))})\\fscx60\\fscy60\\t(0,160,\\fscx100\\fscy100)\\fad(0,200)}}{lines}")
     # testi sovrapposti per scena (es. "LINK IN BIO")
     for sc in timeline:
         ov = sc.get("overlay")
         if ov:
             st = "CTA" if sc.get("kind") == "cta" else "Hook"
-            ev.append(f"Dialogue: 2,{ass_time(sc['t0'] + 0.25)},{ass_time(sc['t1'])},{st},,0,0,0,,{{\\pos({W // 2},{int(H * (0.78 if sc.get('kind') == 'cta' else 0.25))})\\fscx50\\fscy50\\t(0,180,\\fscx100\\fscy100)}}{ass_escape(ov.upper())}")
+            ev.append(f"Dialogue: 2,{ass_time(sc['t0'] + 0.25)},{ass_time(sc['t1'])},{st},,0,0,0,,{{\\pos({int(W * 0.66) if (sc.get('kind') == 'cta' and project.get('mascot')) else W // 2},{int(H * ((0.63 if project.get('mascot') else 0.78) if sc.get('kind') == 'cta' else 0.25))})\\fscx50\\fscy50\\t(0,180,\\fscx100\\fscy100)}}{ass_escape(ov.upper())}")
     handle = b.get("handle")
     if handle:
         total = timeline[-1]["t1"]
@@ -191,7 +191,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 
 # ---------------------------------------------------------------- segmenti video
-GRADE = "eq=contrast=1.07:saturation=1.18:brightness=0.01,vignette=PI/5"
+GRADE = "eq=contrast=1.05:saturation=1.25:brightness=0.035,vignette=PI/8"
 
 
 def stock_segment(src, start, dur, out, zoom_dir):
@@ -205,12 +205,12 @@ def stock_segment(src, start, dur, out, zoom_dir):
          "-vf", vf, "-frames:v", str(frames), "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(out)])
 
 
-def product_segment(cover, bg_src, dur, out, accent):
+def product_segment(cover, bg_src, dur, out, accent, cy=0.5):
     """Copertina che entra con zoom e galleggia sopra uno sfondo sfocato in movimento."""
     frames = int(round(dur * FPS))
-    flt = (f"[0:v]scale=-2:{H},crop={W}:{H},fps={FPS},gblur=sigma=28,eq=brightness=-0.18:saturation=1.1,format=yuv420p[bg];"
+    flt = (f"[0:v]scale=-2:{H},crop={W}:{H},fps={FPS},gblur=sigma=26,eq=brightness=-0.07:saturation=1.2,format=yuv420p[bg];"
            f"[1:v]format=rgba,scale=w='min(780,520+1300*t)':h=-1:eval=frame[cv];"
-           f"[bg][cv]overlay=x='(W-w)/2':y='(H-h)/2-190+18*sin(2*PI*t/3)':eval=frame,vignette=PI/4,format=yuv420p[v]")
+           f"[bg][cv]overlay=x='(W-w)/2':y='H*{cy}-h/2-190*{1 if cy == 0.5 else 0}+18*sin(2*PI*t/3)':eval=frame,vignette=PI/4,format=yuv420p[v]")
     run(["ffmpeg", "-v", "error", "-y", "-ss", "1", "-i", str(bg_src), "-loop", "1", "-framerate", str(FPS), "-i", str(cover),
          "-filter_complex", flt, "-map", "[v]", "-t", f"{dur:.3f}", "-frames:v", str(frames), "-an",
          "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(out)])
@@ -229,6 +229,11 @@ def make(project_path, out_path):
     gap = 0.18
     for i, sc in enumerate(P["scenes"]):
         mp3, words = tts(sc["say"], voice, rate, pitch)
+        if P.get("voice_fx"):
+            fx = CACHE / (mp3.stem + "-fx-" + hashlib.sha1(P["voice_fx"].encode()).hexdigest()[:8] + ".mp3")
+            if not fx.exists():
+                run(["ffmpeg", "-v", "error", "-y", "-i", str(mp3), "-af", P["voice_fx"], "-c:a", "libmp3lame", "-b:a", "192k", str(fx)])
+            mp3 = fx
         vd = probe_dur(mp3)
         dur = round(max(vd + gap, sc.get("min_dur", 0)), 2)
         timeline.append({"t0": t, "t1": t + dur, "words": words, "overlay": sc.get("overlay"), "kind": sc.get("kind", "stock"),
@@ -239,7 +244,7 @@ def make(project_path, out_path):
             bgid = str(sc["clips"][0]) if sc.get("clips") else next((v for kw in sc.get("keywords", ["abstract"]) for v in mixkit_search(kw) if v not in used), None)
             used.add(bgid)
             seg = work / f"s{i:02d}.mp4"
-            product_segment(base / P["cover"], clip_file(bgid), dur, seg, P["brand"].get("accent", "#FFD233"))
+            product_segment(base / P["cover"], clip_file(bgid), dur, seg, P["brand"].get("accent", "#FFD233"), cy=0.36 if P.get("mascot") else 0.5)
             segs.append(seg)
         else:
             fixed = [str(v) for v in sc.get("clips", [])]
@@ -284,7 +289,30 @@ def make(project_path, out_path):
     else:
         flt.append("[voice]anull[aout]")
     fonts = str(Path.home() / ".fonts")
-    flt.append(f"[0:v]ass={ass}:fontsdir={fonts}[vout]")
+    vin = "[0:v]"
+    M = P.get("mascot")
+    if M:
+        # voce completa (mono) per il labiale, poi fotogrammi trasparenti del personaggio
+        vwav = work / "voice.wav"
+        vf = [f"[{k}:a]adelay={int(st * 1000)}|{int(st * 1000)}[a{k}]" for k, (mp3, st) in enumerate(voice_parts)]
+        vf.append("".join(f"[a{k}]" for k in range(nv)) + f"amix=inputs={nv}:normalize=0,apad,atrim=0:{total:.2f}[o]")
+        run(["ffmpeg", "-v", "error", "-y", *sum([["-i", str(m)] for m, _ in voice_parts], []), "-filter_complex", ";".join(vf), "-map", "[o]", "-ac", "1", "-ar", "24000", str(vwav)])
+        fr = work / "mascot"
+        if fr.exists():
+            for f in fr.glob("*.png"):
+                f.unlink()
+        size = int(M.get("size", 520))
+        if M.get("kind") in ("robot3d", "nova3d"):
+            cmd = ["node", str(Path(__file__).parent / "robot3d.js"), str(vwav), str(fr), str(FPS), f"{total:.2f}", P["brand"].get("accent", "#FFD233"), str(size), M.get("glow", "#6be4ff" if M["kind"] == "robot3d" else "#ff4fae"), M["kind"]]
+        else:
+            cmd = ["node", str(Path(__file__).parent / "mascot.js"), str(vwav), str(fr), str(FPS), f"{total:.2f}", M.get("kind", "robot"), P["brand"].get("accent", "#FFD233"), str(size)]
+        subprocess.run(cmd, check=True, capture_output=True)
+        inputs += ["-framerate", str(FPS), "-i", str(fr / "f%05d.png")]
+        idx = sum(1 for x in inputs if x == "-i") - 1
+        mx, my = int(W * M.get("x", 0.02)), int(H * M.get("y", 0.62))
+        flt.append(f"[0:v][{idx}:v]overlay=x={mx}:y={my}:eof_action=pass[vm]")
+        vin = "[vm]"
+    flt.append(f"{vin}ass={ass}:fontsdir={fonts}[vout]")
     run(["ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex", ";".join(flt), "-map", "[vout]", "-map", "[aout]",
          "-t", f"{total:.2f}", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-profile:v", "high", "-pix_fmt", "yuv420p",
          "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out_path)])

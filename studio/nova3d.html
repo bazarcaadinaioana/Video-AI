@@ -1,0 +1,138 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:transparent}canvas{display:block}</style>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+<script src="../lib/personaggi.js"></script>
+</head><body>
+<script type="module">
+// "Nova": robot femmina originale. Testa bianca lucida che fluttua sopra un corpo a uovo,
+// viso a LED rosa con ciglia e guance, dettagli oro rosa, braccia fluttuanti, luce rosa alla base.
+import * as THREE from "three";
+import { RoomEnvironment } from "./vendor/RoomEnvironment.js";
+
+const P = new URLSearchParams(location.search);
+const Wd = +(P.get("w") || 600), Ht = +(P.get("h") || 690);
+const LED = P.get("glow") || "#ff4fae";
+const LEDc = new THREE.Color(LED);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setSize(Wd, Ht); renderer.setPixelRatio(1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.08;
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.setClearColor(0x000000, 0);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+const camera = new THREE.PerspectiveCamera(30, Wd / Ht, 0.1, 100);
+camera.position.set(0, 0.2, 10.2); camera.lookAt(0, -0.35, 0);
+const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(-3, 5, 5); scene.add(key);
+const rimP = new THREE.DirectionalLight(0xffb3d9, 2.6); rimP.position.set(4, 2, -4); scene.add(rimP);
+const rimW = new THREE.DirectionalLight(0xffffff, 1.2); rimW.position.set(-4, 1, -3); scene.add(rimW);
+
+const white = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.22, clearcoat: 1, clearcoatRoughness: 0.05, vertexColors: false });
+const roseGold = new THREE.MeshStandardMaterial({ color: 0xe9b7a6, metalness: 1, roughness: 0.25 });
+const blush = new THREE.MeshPhysicalMaterial({ color: 0xf7c9d8, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.08 });
+const ledM = new THREE.MeshBasicMaterial({ color: LEDc, toneMapped: false });
+
+const root = new THREE.Group(); scene.add(root);
+
+// ---- viso a LED disegnato su canvas (pixel), mappato sulla visiera
+const FW = 160, FH = 90; const face = document.createElement("canvas"); face.width = 640; face.height = 360;
+const low = document.createElement("canvas"); low.width = FW; low.height = FH;
+const faceTex = new THREE.CanvasTexture(face); faceTex.colorSpace = THREE.SRGBColorSpace;
+function drawFace(t, o, bl, look) {
+  const g = low.getContext("2d"); g.clearRect(0, 0, FW, FH); g.fillStyle = LED;
+  const ex = 40, ey = 36, gap = 74, cx = FW / 2 + look * 4;
+  for (const s of [-1, 1]) {
+    const x = cx + s * gap / 2, h = Math.max(2, 26 * (1 - bl)), w = 17;
+    g.beginPath(); g.roundRect(x - w / 2, ey - h / 2, w, h, 6); g.fill();
+    if (bl < 0.5) { // ciglia sul lato esterno
+      for (let k = 0; k < 3; k++) { g.fillRect(x + s * (w / 2 + 1 + k * 3), ey - h / 2 - 5 + k * 3, 4, 2.6); }
+    }
+  }
+  // guance
+  g.globalAlpha = 0.45; for (const s of [-1, 1]) { g.beginPath(); g.ellipse(cx + s * 52, 58, 11, 5.5, 0, 0, Math.PI * 2); g.fill(); } g.globalAlpha = 1;
+  // bocca
+  if (o < 0.07) { g.lineWidth = 4; g.strokeStyle = LED; g.beginPath(); g.arc(cx, 55, 11, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); }
+  else { const mh = 4 + o * 22, mw = 22 - o * 4; g.beginPath(); g.roundRect(cx - mw / 2, 63 - mh / 2, mw, mh, 7); g.fill(); }
+  // ingrandisci a pixel + bagliore + griglia LED
+  const G = face.getContext("2d"); G.fillStyle = "#05060c"; G.fillRect(0, 0, face.width, face.height);
+  G.imageSmoothingEnabled = false; G.shadowColor = LED; G.shadowBlur = 22; G.drawImage(low, 0, 0, face.width, face.height); G.shadowBlur = 0;
+  G.fillStyle = "rgba(0,0,0,0.35)"; for (let x = 0; x < face.width; x += 4) G.fillRect(x, 0, 1, face.height); for (let y = 0; y < face.height; y += 4) G.fillRect(0, y, face.width, 1);
+  faceTex.needsUpdate = true;
+}
+
+// ---- testa
+const head = new THREE.Group(); head.position.y = 1.05; root.add(head);
+const skull = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), white); skull.scale.set(1.12, 0.92, 0.98); head.add(skull);
+const visorMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: faceTex, emissive: 0xffffff, emissiveMap: faceTex, emissiveIntensity: 1.1, roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.35, envMapIntensity: 0.12 });
+const visor = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 48, Math.PI / 2 - 0.85, 1.7, Math.PI / 2 - 0.5, 0.98), visorMat);
+visor.scale.set(1.14, 0.94, 1.0); head.add(visor);
+// orecchie oro rosa con led
+for (const s of [-1, 1]) {
+  const ear = new THREE.Group(); ear.position.set(s * 1.1, 0.02, -0.05); ear.rotation.y = s * Math.PI / 2; head.add(ear);
+  const pod = new THREE.Mesh(new THREE.SphereGeometry(0.3, 48, 32), blush); pod.scale.set(1, 1, 0.45); ear.add(pod);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.035, 20, 64), roseGold); ring.position.z = 0.1; ear.add(ring);
+  const led = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.014, 8, 48), ledM); led.position.z = 0.14; ear.add(led);
+}
+// fermaglio a fiocco (dettaglio femminile)
+const bow = new THREE.Group(); bow.position.set(0.62, 0.72, 0.28); bow.rotation.set(-0.5, 0.35, -0.35); head.add(bow);
+for (const s of [-1, 1]) { const lobe = new THREE.Mesh(new THREE.SphereGeometry(0.15, 32, 24), blush); lobe.scale.set(1.25, 0.8, 0.45); lobe.position.x = s * 0.15; lobe.rotation.z = s * 0.25; bow.add(lobe); }
+bow.add(new THREE.Mesh(new THREE.SphereGeometry(0.07, 24, 16), roseGold));
+
+// ---- anello del collo luminoso (la testa fluttua)
+const neckRing = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.03, 12, 64), ledM); neckRing.rotation.x = Math.PI / 2; neckRing.position.y = 0.05; root.add(neckRing);
+
+// ---- corpo a uovo: bianco sopra, rosa sotto
+const body = new THREE.Group(); body.position.y = -0.95; root.add(body);
+const eggPts = []; for (let i = 0; i <= 40; i++) { const a = -Math.PI / 2 + Math.PI * i / 40; const y = Math.sin(a); const r = Math.cos(a) * (y < 0 ? 1 - 0.18 * y * y : 1 - 0.05 * y); eggPts.push(new THREE.Vector2(Math.max(0.001, r), y)); }
+const eggGeo = new THREE.LatheGeometry(eggPts, 96);
+const top = new THREE.Mesh(eggGeo, white); top.scale.set(0.86, 1.05, 0.78); body.add(top);
+const band = new THREE.Mesh(eggGeo, blush); band.scale.set(0.875, 1.06, 0.795);
+band.material = blush.clone(); band.material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, -1, 0), -1.3)]; body.add(band);
+renderer.localClippingEnabled = true;
+// pannello sul petto con cuore
+const panel = new THREE.Mesh(new THREE.CircleGeometry(0.2, 48), new THREE.MeshPhysicalMaterial({ color: 0x05060c, roughness: 0.1, clearcoat: 1 }));
+panel.position.set(0, 0.38, 0.745); panel.rotation.x = -0.25; body.add(panel);
+const heartShape = new THREE.Shape(); heartShape.moveTo(0, -0.06); heartShape.bezierCurveTo(-0.13, 0.03, -0.06, 0.12, 0, 0.05); heartShape.bezierCurveTo(0.06, 0.12, 0.13, 0.03, 0, -0.06);
+const heart = new THREE.Mesh(new THREE.ShapeGeometry(heartShape, 24), ledM); heart.position.set(0, 0.39, 0.752); heart.rotation.x = -0.25; heart.scale.setScalar(1.1); body.add(heart);
+// luci rosa alla base
+const baseGlow = []; for (let k = 0; k < 5; k++) { const m = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.12, 6, 12), ledM); const a = (k - 2) * 0.38; m.position.set(Math.sin(a) * 0.5, -0.78, Math.cos(a) * 0.46); m.rotation.x = 0.6; m.rotation.z = -a * 0.6; body.add(m); baseGlow.push(m); }
+
+// ---- braccia fluttuanti
+const arms = [-1, 1].map(s => {
+  const g = new THREE.Group(); g.position.set(s * 0.95, -0.55, 0.05); root.add(g);
+  const up = new THREE.Mesh(new THREE.CapsuleGeometry(0.14, 0.45, 12, 24), white); up.position.y = -0.3; g.add(up);
+  const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.135, 0.03, 12, 32), roseGold); cuff.rotation.x = Math.PI / 2; cuff.position.y = -0.52; g.add(cuff);
+  const hand = new THREE.Mesh(new THREE.SphereGeometry(0.15, 32, 24), blush); hand.scale.set(1, 1.15, 0.8); hand.position.y = -0.7; g.add(hand);
+  return g;
+});
+
+let LIP = [];
+function hash(n) { const s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); }
+function blink(t) { const k = Math.floor(t / 3.2), ph = t - k * 3.2 - hash(k) * 1.4; return ph > 0 && ph < 0.16 ? Math.sin(ph / 0.16 * Math.PI) : 0; }
+window.setLip = a => { LIP = a; };
+window.computeLip = async (b64, fps) => {
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const buf = await new OfflineAudioContext(1, 24000, 24000).decodeAudioData(bytes.buffer);
+  LIP = Personaggi.lipsync(buf.getChannelData(0), buf.sampleRate, fps); return LIP.length;
+};
+window.frame = (i, fps) => {
+  const t = i / fps, L = LIP[Math.min(LIP.length - 1, i)] || { o: 0 }, o = L.o;
+  drawFace(t, o, blink(t), Math.sin(t * 0.7));
+  root.position.y = Math.sin(t * 1.6) * 0.08;
+  root.rotation.y = Math.sin(t * 0.45) * 0.18;
+  head.rotation.y = Math.sin(t * 0.6) * 0.12; head.rotation.z = Math.sin(t * 0.9) * 0.06 + 0.05;
+  head.rotation.x = -0.05 + o * 0.07 * Math.sin(t * 6.5);
+  head.position.y = 1.05 + Math.sin(t * 1.6 + 0.6) * 0.04;
+  const wave = t < 2.2 ? Math.sin(Math.min(1, t / 2.2) * Math.PI) : 0;
+  arms[0].rotation.z = -0.18 + Math.sin(t * 1.4) * 0.06 - o * 0.15 * Math.sin(t * 4);
+  arms[1].rotation.z = 0.18 + Math.sin(t * 1.4 + 1) * 0.06 + wave * (2.5 + Math.sin(t * 12) * 0.3);
+  arms[1].position.y = -0.55 + wave * 0.35;
+  arms.forEach((a, k) => { a.position.x = (k ? 1 : -1) * (0.95 + Math.sin(t * 1.2 + k) * 0.03); });
+  baseGlow.forEach((m, k) => m.material.color.copy(LEDc).multiplyScalar(0.65 + 0.35 * Math.sin(t * 3 + k)));
+  renderer.render(scene, camera);
+  return renderer.domElement.toDataURL("image/png").split(",")[1];
+};
+window.READY = true;
+</script>
+</body></html>
