@@ -156,8 +156,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 groups.append(cur); cur = []
         if cur:
             groups.append(cur)
-        for g in groups:
+        for gi, g in enumerate(groups):
             g_end = g[-1][1] + 0.12
+            if gi + 1 < len(groups):
+                g_end = min(g_end, groups[gi + 1][0][0] - 0.01)
             for i, w in enumerate(g):
                 st = w[0]
                 en = g[i + 1][0] if i + 1 < len(g) else g_end
@@ -170,7 +172,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         parts.append(word)
                 pop = r"{\fscx70\fscy70\t(0,90,\fscx100\fscy100)}" if i == 0 else ""
                 y = int(H * sc["caption_y"]) if sc.get("caption_y") else cap_y
-                ev.append(f"Dialogue: 1,{ass_time(sc['t0'] + st)},{ass_time(sc['t0'] + en)},Cap,,0,0,0,,{{\\pos({int(W * project.get("caption_x", 0.5))},{y})}}{pop}{' '.join(parts)}")
+                ev.append(f"Dialogue: 1,{ass_time(sc['t0'] + st)},{ass_time(sc['t0'] + en)},Cap,,0,0,0,,{{\\pos({int(W * (sc.get("caption_x") or project.get("caption_x", 0.5)))},{y})}}{pop}{' '.join(parts)}")
     # gancio in alto nei primi secondi
     hook = project.get("hook_text")
     if hook:
@@ -205,6 +207,60 @@ def stock_segment(src, start, dur, out, zoom_dir):
          "-vf", vf, "-frames:v", str(frames), "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(out)])
 
 
+def screen_segment(src, start, dur, out, spec, crop_x, work):
+    """Clip con telefono a schermo verde: al posto del verde mette la chat animata, seguendo lo schermo."""
+    import numpy as np
+    from PIL import Image
+    from scipy.ndimage import binary_fill_holes
+    frames = int(round(dur * FPS))
+    cdir = Path(work) / ("chat-" + hashlib.sha1(json.dumps(spec, sort_keys=True).encode() + f"{dur:.2f}".encode() + (Path(__file__).parent / "chat.html").read_bytes()).hexdigest()[:10])
+    if not (cdir.exists() and len(list(cdir.glob("*.png"))) >= frames):
+        sp = Path(work) / "chat-spec.json"
+        sp.write_text(json.dumps({**spec, "dur": dur}))
+        subprocess.run(["node", str(Path(__file__).parent / "chat_render.js"), str(sp), str(cdir), "600", "1200", str(FPS)], check=True, capture_output=True)
+    dec = subprocess.Popen(["ffmpeg", "-v", "error", "-ss", f"{start:.2f}", "-i", str(src), "-t", f"{dur + 0.2:.3f}",
+                            "-vf", f"scale=-2:{H},crop={W}:{H}:{crop_x}:0,fps={FPS}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE)
+    enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
+                            "-vf", f"{GRADE},format=yuv420p", "-frames:v", str(frames), "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(out)], stdin=subprocess.PIPE)
+    box, last = None, None
+    for i in range(frames):
+        buf = dec.stdout.read(W * H * 3)
+        if len(buf) == W * H * 3:
+            last = buf
+        a = np.frombuffer(last, np.uint8).reshape(H, W, 3).astype(np.float32)
+        g = a[:, :, 1] - np.maximum(a[:, :, 0], a[:, :, 2])
+        alpha = np.clip((g - 20) / 45, 0, 1)
+        from scipy.ndimage import label
+        lab, n = label(alpha > 0.5)
+        if n:  # tieni solo la regione verde più grande: lo schermo (non le piante sullo sfondo)
+            sizes = np.bincount(lab.ravel()); sizes[0] = 0
+            screen = lab == sizes.argmax()
+        else:
+            screen = np.zeros(alpha.shape, bool)
+        solid = binary_fill_holes(screen)               # riempie i segni di tracciamento sullo schermo
+        ys, xs = np.nonzero(solid)
+        if len(xs):
+            m = np.zeros(alpha.shape, np.float32); m[max(0, ys.min() - 6):ys.max() + 7, max(0, xs.min() - 6):xs.max() + 7] = 1
+            alpha = np.maximum(alpha * m, solid.astype(np.float32))
+        else:
+            alpha = alpha * 0
+        if len(xs):
+            nb = np.array([xs.min(), ys.min(), xs.max(), ys.max()], np.float32)
+            box = nb if box is None else box * 0.4 + nb * 0.6
+        if box is not None:
+            x0, y0, x1, y1 = [int(round(v)) for v in box]
+            cimg = Image.open(cdir / f"c{min(i, frames - 1):05d}.png").convert("RGB").resize((max(2, x1 - x0 + 1), max(2, y1 - y0 + 1)), Image.LANCZOS)
+            C = np.zeros_like(a)
+            cy0, cx0 = max(0, y0), max(0, x0)
+            arr = np.asarray(cimg, np.float32)[cy0 - y0:, cx0 - x0:]
+            C[cy0:cy0 + arr.shape[0], cx0:cx0 + arr.shape[1]] = arr[:H - cy0, :W - cx0]
+            # togli il riflesso verde dai bordi
+            a[:, :, 1] = np.where(alpha > 0, np.minimum(a[:, :, 1], np.maximum(a[:, :, 0], a[:, :, 2])), a[:, :, 1])
+            a = a * (1 - alpha[..., None]) + C * alpha[..., None]
+        enc.stdin.write(np.clip(a, 0, 255).astype(np.uint8).tobytes())
+    enc.stdin.close(); enc.wait(); dec.kill()
+
+
 def product_segment(cover, bg_src, dur, out, accent, cy=0.5):
     """Copertina che entra con zoom e galleggia sopra uno sfondo sfocato in movimento."""
     frames = int(round(dur * FPS))
@@ -237,10 +293,16 @@ def make(project_path, out_path):
         vd = probe_dur(mp3)
         dur = round(max(vd + gap, sc.get("min_dur", 0)), 2)
         timeline.append({"t0": t, "t1": t + dur, "words": words, "overlay": sc.get("overlay"), "kind": sc.get("kind", "stock"),
-                         "no_captions": sc.get("no_captions", False), "caption_y": sc.get("caption_y")})
+                         "no_captions": sc.get("no_captions", False), "caption_y": sc.get("caption_y"), "caption_x": sc.get("caption_x")})
         voice_parts.append((mp3, t))
         # video della scena
-        if sc.get("kind") in ("product", "cta"):
+        if sc.get("screen"):
+            scr = sc["screen"]
+            src = clip_file(str(scr["clip"]))
+            seg = work / f"s{i:02d}.mp4"
+            screen_segment(src, scr.get("start", 0.3), dur, seg, {k: v for k, v in scr.items() if k not in ("clip", "start", "crop_x")}, scr.get("crop_x", 1166), work)
+            segs.append(seg)
+        elif sc.get("kind") in ("product", "cta"):
             bgid = str(sc["clips"][0]) if sc.get("clips") else next((v for kw in sc.get("keywords", ["abstract"]) for v in mixkit_search(kw) if v not in used), None)
             used.add(bgid)
             seg = work / f"s{i:02d}.mp4"

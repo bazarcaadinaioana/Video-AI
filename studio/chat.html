@@ -1,0 +1,69 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Schermata di una chat con un assistente AI (generica, senza marchi), animata dal tempo t. */
+:root { --bg:#0f1117; --panel:#171a23; --line:#262b38; --text:#eef1f7; --muted:#8d95a8; --user:#2f6bff; --accent:#ffc21a; --ai:#1d2130; }
+* { box-sizing: border-box; margin: 0; }
+html, body { width: 100%; height: 100%; background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; overflow: hidden; }
+.app { position: absolute; inset: 1.5% 6% 1% 6%; display: flex; flex-direction: column; }
+.status { height: 6%; display: flex; align-items: center; justify-content: space-between; padding: 0 7%; font-size: 3.6vw; font-weight: 600; }
+.top { display: flex; align-items: center; gap: 3vw; padding: 2.5vw 5vw 4vw; border-bottom: 1px solid var(--line); }
+.logo { width: 9vw; height: 9vw; border-radius: 50%; background: conic-gradient(from 200deg, #7c5cff, #2f6bff, #26d0ce, #7c5cff); display: grid; place-items: center; font-size: 5vw; }
+.title { font-weight: 700; font-size: 4.6vw; }
+.sub { color: var(--muted); font-size: 3.2vw; }
+.msgs { flex: 1; padding: 5vw 4.5vw; display: flex; flex-direction: column; gap: 4vw; justify-content: flex-start; overflow: hidden; }
+.b { max-width: 84%; padding: 3.4vw 4vw; border-radius: 5vw; font-size: 4.3vw; line-height: 1.38; white-space: pre-wrap; }
+.u { align-self: flex-end; background: var(--user); border-bottom-right-radius: 1.5vw; }
+.a { align-self: flex-start; background: var(--ai); border: 1px solid var(--line); border-bottom-left-radius: 1.5vw; }
+.k { color: var(--accent); font-weight: 700; }
+.a .k { color: #8fb0ff; }
+.dots span { display: inline-block; width: 2vw; height: 2vw; margin: 0 .6vw; border-radius: 50%; background: var(--muted); }
+.input { margin: 3vw 4vw 5vw; padding: 3.4vw 4vw; border-radius: 7vw; background: var(--panel); border: 1px solid var(--line); color: var(--muted); font-size: 4vw; display: flex; justify-content: space-between; align-items: center; }
+.send { width: 8vw; height: 8vw; border-radius: 50%; background: var(--user); display: grid; place-items: center; color: #fff; font-size: 4.4vw; }
+#ph { flex: 1; max-height: 16.5vw; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; line-height: 1.35; margin-right: 2vw; }
+.caret { display: inline-block; width: .5vw; height: 4.6vw; background: #fff; vertical-align: -0.8vw; margin-left: .3vw; }
+</style></head><body>
+<div class="app">
+  <div class="status"><span>9:41</span><span>●●● 100%</span></div>
+  <div class="top"><div class="logo">✦</div><div><div class="title" id="title">Assistente AI</div><div class="sub" id="sub">online</div></div></div>
+  <div class="msgs" id="msgs"></div>
+  <div class="input"><span id="ph">Scrivi un messaggio…</span><span class="send">↑</span></div>
+</div>
+<script>
+// spec: { prompt, answer, title, sub, placeholder, dur }
+// Nel prompt, le parole tra **doppi asterischi** sono evidenziate.
+let S = null;
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+function rich(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<span class="k">$1</span>'); }
+function cut(s, n) { // primi n caratteri visibili, senza rompere i marcatori
+  let out = "", vis = 0, i = 0;
+  while (i < s.length && vis < n) { if (s.startsWith("**", i)) { out += "**"; i += 2; continue; } out += s[i]; i++; vis++; }
+  if ((out.match(/\*\*/g) || []).length % 2) out += "**";
+  return out;
+}
+const plain = s => s.replace(/\*\*/g, "");
+window.setup = spec => { S = spec; document.getElementById("title").textContent = spec.title || "Assistente AI"; document.getElementById("sub").textContent = spec.sub || "online"; document.getElementById("ph").textContent = spec.placeholder || "Scrivi un messaggio…"; };
+window.at = t => {
+  const D = S.dur, P = plain(S.prompt).length, A = plain(S.answer).length;
+  const tType = Math.min(D * 0.45, P / 26), tSend = tType + 0.25, tThink = tSend + 0.7, tAns = Math.max(0.8, D - tThink - 0.3);
+  const m = document.getElementById("msgs"); let h = "";
+  if (t < tSend) {
+    // il prompt viene scritto nella casella di testo
+    const n = Math.floor(P * Math.min(1, t / tType));
+    document.getElementById("ph").innerHTML = '<div>' + (n ? '<span style="color:#eef1f7">' + rich(cut(S.prompt, n)) + '</span>' : esc(S.placeholder || "Scrivi un messaggio…")) + '<span class="caret"></span></div>';
+  } else {
+    document.getElementById("ph").textContent = S.placeholder || "Scrivi un messaggio…";
+    h += '<div class="b u">' + rich(S.prompt) + '</div>';
+    if (t < tThink) {
+      const k = Math.floor(t * 6) % 3;
+      h += '<div class="b a dots">' + [0, 1, 2].map(i => `<span style="opacity:${i === k ? 1 : .35}"></span>`).join("") + '</div>';
+    } else {
+      const n = Math.floor(A * Math.min(1, (t - tThink) / tAns));
+      h += '<div class="b a">' + rich(cut(S.answer, n)) + '</div>';
+    }
+  }
+  m.innerHTML = h;
+};
+window.READY = true;
+</script></body></html>
