@@ -271,11 +271,11 @@ window.READY = true;
 .sw { position: relative; width: 300px; height: 300px; margin-top: 50px; }
 .sw svg { position: absolute; inset: 0; transform: rotate(-90deg); }
 .sw .t { position: absolute; inset: 0; display: grid; place-items: center; font: 900 92px Montserrat; }
-.plan { position: absolute; left: 50px; right: 50px; top: 540px; height: 600px; padding: 30px; }
-.plan .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; height: 100%; }
+.plan { position: absolute; left: 40px; right: 40px; top: 540px; height: 560px; padding: 28px 22px; }
+.plan .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; height: 100%; }
 .plan .day { display: flex; flex-direction: column; gap: 12px; }
-.plan .dh { font: 800 30px Montserrat; text-align: center; color: #c9cbe0; padding-bottom: 10px; border-bottom: 2px solid var(--line); }
-.plan .ev { border-radius: 16px; padding: 12px 8px; font: 700 21px/1.15 Inter; color: #0b0b14; text-align: center; }
+.plan .dh { font: 900 40px Montserrat; text-align: center; color: #c9cbe0; padding-bottom: 10px; border-bottom: 2px solid var(--line); }
+.plan .ev { border-radius: 18px; padding: 16px 6px; font: 800 25px/1.12 Inter; color: #0b0b14; text-align: center; }
 .doc { position: absolute; width: 330px; height: 430px; border-radius: 20px; background: #f4f5fb; box-shadow: 0 30px 60px rgba(0,0,0,.45); padding: 34px 30px; color: #222; }
 .doc .tag { display: inline-block; font: 900 30px Montserrat; color: #fff; background: #e5484d; padding: 6px 16px; border-radius: 10px; }
 .doc i { display: block; height: 14px; border-radius: 7px; background: #d8dbe8; margin-top: 18px; }
@@ -339,9 +339,9 @@ Object.assign(BUILD, {
   bookcta(sc, S, tl) {
     const d = sc.data;
     S.innerHTML = `<div class="zone" style="top:300px;height:300px;justify-content:flex-start"><div class="title grad" style="font-size:96px">${esc(d.title)}</div></div>
-      <div class="book3d" style="position:absolute;left:70px;top:520px"><div class="b" style="width:430px;height:645px"><img src="${d.cover}"><div class="shine"></div></div></div>
-      <div class="badge" style="left:330px;top:490px">${esc(d.badge)}</div>
-      <div class="btn" style="position:absolute;left:80px;top:1240px;margin:0;font-size:60px;padding:30px 60px">${esc(d.button)}</div>`;
+      <div class="book3d" style="position:absolute;left:60px;top:500px"><div class="b" style="width:480px;height:720px"><img src="${d.cover}"><div class="shine"></div></div></div>
+      <div class="badge" style="left:360px;top:470px">${esc(d.badge)}</div>
+      <div class="btn" style="position:absolute;left:70px;top:1270px;margin:0;font-size:60px;padding:30px 60px">${esc(d.button)}</div>`;
     const b = $(".b", S);
     tl.from($(".title", S), { y: -60, opacity: 0, duration: .5 }, sc.t0 + .05)
       .fromTo(b, { rotationY: -80, scale: .5, opacity: 0 }, { rotationY: -14, scale: 1, opacity: 1, duration: 1, ease: "power3.out" }, sc.t0 + .2)
