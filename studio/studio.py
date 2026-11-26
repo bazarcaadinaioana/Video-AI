@@ -223,6 +223,8 @@ def screen_segment(src, start, dur, out, spec, crop_x, work):
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
                             "-vf", f"{GRADE},format=yuv420p", "-frames:v", str(frames), "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", str(out)], stdin=subprocess.PIPE)
     box, last = None, None
+    GY = np.linspace(0, 1, H, dtype=np.float32)[:, None, None]
+    GX = np.linspace(0, 1, W, dtype=np.float32)[None, :, None]
     for i in range(frames):
         buf = dec.stdout.read(W * H * 3)
         if len(buf) == W * H * 3:
@@ -244,16 +246,24 @@ def screen_segment(src, start, dur, out, spec, crop_x, work):
             alpha = np.maximum(alpha * m, solid.astype(np.float32))
         else:
             alpha = alpha * 0
-        if len(xs):
-            nb = np.array([xs.min(), ys.min(), xs.max(), ys.max()], np.float32)
-            box = nb if box is None else box * 0.4 + nb * 0.6
+        if len(xs) > 500:
+            # i 4 angoli reali dello schermo (anche se il telefono è inclinato o in prospettiva)
+            sm, df = xs + ys, xs - ys
+            quad = np.array([[xs[sm.argmin()], ys[sm.argmin()]], [xs[df.argmax()], ys[df.argmax()]],
+                             [xs[sm.argmax()], ys[sm.argmax()]], [xs[df.argmin()], ys[df.argmin()]]], np.float32)
+            box = quad if box is None else box * 0.35 + quad * 0.65
         if box is not None:
-            x0, y0, x1, y1 = [int(round(v)) for v in box]
-            cimg = Image.open(cdir / f"c{min(i, frames - 1):05d}.png").convert("RGB").resize((max(2, x1 - x0 + 1), max(2, y1 - y0 + 1)), Image.LANCZOS)
-            C = np.zeros_like(a)
-            cy0, cx0 = max(0, y0), max(0, x0)
-            arr = np.asarray(cimg, np.float32)[cy0 - y0:, cx0 - x0:]
-            C[cy0:cy0 + arr.shape[0], cx0:cx0 + arr.shape[1]] = arr[:H - cy0, :W - cx0]
+            cimg = Image.open(cdir / f"c{min(i, frames - 1):05d}.png").convert("RGB")
+            cw, ch = cimg.size
+            # trasformazione prospettica: punto del fotogramma -> punto della chat
+            A, Bv = [], []
+            for (X, Y), (u, v) in zip(box, [(0, 0), (cw, 0), (cw, ch), (0, ch)]):
+                A += [[X, Y, 1, 0, 0, 0, -u * X, -u * Y], [0, 0, 0, X, Y, 1, -v * X, -v * Y]]; Bv += [u, v]
+            coef = np.linalg.solve(np.array(A, np.float64), np.array(Bv, np.float64))
+            C = np.asarray(cimg.transform((W, H), Image.PERSPECTIVE, tuple(coef), Image.BICUBIC), np.float32)
+            # luce della stanza e riflesso del vetro
+            C = C * 0.93 + 6
+            C = C + 16 * np.clip(1 - np.abs((GX * 0.7 + GY * 0.6) - 0.55) * 6, 0, 1)
             # togli il riflesso verde dai bordi
             a[:, :, 1] = np.where(alpha > 0, np.minimum(a[:, :, 1], np.maximum(a[:, :, 0], a[:, :, 2])), a[:, :, 1])
             a = a * (1 - alpha[..., None]) + C * alpha[..., None]
@@ -339,15 +349,15 @@ def make(project_path, out_path):
         inputs += ["-i", str(mp3)]
         flt.append(f"[{k + 1}:a]adelay={int(st * 1000)}|{int(st * 1000)},aformat=channel_layouts=stereo[v{k}]")
     nv = len(voice_parts)
-    flt.append("".join(f"[v{k}]" for k in range(nv)) + f"amix=inputs={nv}:normalize=0,volume=1.6,asplit=2[voice][side]")
+    flt.append("".join(f"[v{k}]" for k in range(nv)) + f"amix=inputs={nv}:normalize=0,dynaudnorm=f=150:g=7:p=0.9,highpass=f=90,equalizer=f=3000:t=q:w=1.2:g=3,asplit=2[voice][side]")
     music = P.get("music")
     if music:
         mfile = fetch(f"https://assets.mixkit.co/music/{music}/{music}.mp3", CACHE / f"music-{music}.mp3")
         inputs += ["-stream_loop", "-1", "-i", str(mfile)]
         mi = nv + 1
-        flt.append(f"[{mi}:a]volume={P.get('music_volume', 0.35)},afade=t=in:d=0.6,afade=t=out:st={max(0, total - 1.5):.2f}:d=1.5,aformat=channel_layouts=stereo[m]")
-        flt.append("[m][side]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=350[mduck]")
-        flt.append("[voice][mduck]amix=inputs=2:normalize=0,alimiter=limit=0.95[aout]")
+        flt.append(f"[{mi}:a]volume={P.get('music_volume', 0.12)},equalizer=f=1500:t=q:w=1.5:g=-6,equalizer=f=3000:t=q:w=1.5:g=-5,afade=t=in:d=0.6,afade=t=out:st={max(0, total - 1.5):.2f}:d=1.5,aformat=channel_layouts=stereo[m]")
+        flt.append("[m][side]sidechaincompress=threshold=0.015:ratio=14:attack=10:release=400:makeup=1[mduck]")
+        flt.append("[voice][mduck]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.2:LRA=9,alimiter=limit=0.95[aout]")
     else:
         flt.append("[voice]anull[aout]")
     fonts = str(Path.home() / ".fonts")
