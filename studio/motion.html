@@ -1,0 +1,245 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<script src="./vendor/gsap.min.js"></script>
+<style>
+/* Motion design verticale 1080x1920, guidato dal tempo (seek) e sincronizzato con le parole della voce. */
+:root { --ink:#07070d; --white:#f7f7fb; --gold:#ffc21a; --pink:#ff4fae; --blue:#4d7cff; --mint:#3ee6b4; --glass:rgba(255,255,255,.08); --line:rgba(255,255,255,.16); }
+* { box-sizing: border-box; margin: 0; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--ink); color: var(--white); font-family: Inter, "Noto Color Emoji", sans-serif; }
+#stage { position: absolute; inset: 0; overflow: hidden; }
+.blob { position: absolute; border-radius: 50%; filter: blur(140px); opacity: .55; }
+#grain { position: absolute; inset: 0; opacity: .09; mix-blend-mode: overlay; }
+#parts { position: absolute; inset: 0; }
+#floor { position: absolute; left: -20%; right: -20%; bottom: -10%; height: 50%; transform: perspective(700px) rotateX(70deg); transform-origin: bottom; opacity: .18;
+  background-image: linear-gradient(var(--line) 2px, transparent 2px), linear-gradient(90deg, var(--line) 2px, transparent 2px); background-size: 120px 120px; }
+.scene { position: absolute; inset: 0; opacity: 0; }
+.zone { position: absolute; left: 50px; right: 50px; top: 210px; height: 1060px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.kicker { font: 800 34px Montserrat; letter-spacing: .32em; color: var(--gold); padding-left: .32em; }
+.title { font: 900 150px/0.95 Montserrat; letter-spacing: -.02em; }
+.grad, .ch { background: linear-gradient(180deg, #fff 30%, #ffd56a 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.title.hk { background: none; font-size: 128px; }
+.ln { white-space: nowrap; }
+.sub { font: 600 44px Inter; color: #c9cbe0; margin-top: 30px; }
+.glass { background: linear-gradient(160deg, rgba(255,255,255,.13), rgba(255,255,255,.04)); border: 2px solid var(--line); border-radius: 44px; box-shadow: 0 40px 90px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.2); backdrop-filter: blur(20px); }
+/* telefono */
+.phone { position: relative; width: 560px; height: 1000px; border-radius: 74px; background: #0c0d14; border: 14px solid #1d1f2b; box-shadow: 0 0 0 3px #3a3d4f, 0 60px 120px rgba(0,0,0,.6), 0 0 120px rgba(77,124,255,.25); overflow: hidden; }
+.phone .notch { position: absolute; top: 16px; left: 50%; width: 140px; height: 38px; margin-left: -70px; border-radius: 20px; background: #000; }
+.phone .hdr { position: absolute; top: 84px; left: 34px; right: 34px; display: flex; align-items: center; gap: 18px; font: 700 36px Inter; }
+.phone .av { width: 66px; height: 66px; border-radius: 50%; background: conic-gradient(from 200deg, #7c5cff, #4d7cff, #3ee6b4, #7c5cff); display: grid; place-items: center; font-size: 28px; }
+.phone .msgs { position: absolute; top: 190px; left: 26px; right: 26px; display: flex; flex-direction: column; gap: 22px; }
+.bub { max-width: 86%; padding: 22px 26px; border-radius: 30px; font: 500 36px/1.35 Inter; white-space: pre-wrap; }
+.bu { align-self: flex-end; background: var(--blue); border-bottom-right-radius: 8px; }
+.ba { align-self: flex-start; background: #1b1d2a; border: 2px solid #2a2d3e; border-bottom-left-radius: 8px; }
+.phone .inp { position: absolute; left: 26px; right: 26px; bottom: 38px; height: 96px; border-radius: 48px; background: #161825; border: 2px solid #2a2d3e; font: 500 33px Inter; color: #8d93ad; display: flex; align-items: center; padding: 0 30px; }
+.caret { display: inline-block; width: 3px; height: 34px; background: #fff; margin-left: 3px; vertical-align: -6px; }
+.stamp { position: absolute; font: 900 74px Montserrat; color: #ff4d6d; border: 8px solid #ff4d6d; border-radius: 22px; padding: 6px 26px; letter-spacing: .04em; transform: rotate(-12deg); background: rgba(7,7,13,.6); }
+/* ingredienti */
+.chips { display: grid; grid-template-columns: 1fr; gap: 24px; width: 960px; margin-top: 40px; }
+.chip { display: flex; align-items: center; gap: 30px; padding: 26px 38px; text-align: left; }
+.chip .ic { width: 112px; height: 112px; border-radius: 32px; display: grid; place-items: center; font-size: 64px; flex: none; }
+.chip b { display: block; font: 900 58px Montserrat; }
+.chip span { font: 500 36px Inter; color: #c9cbe0; }
+.chip .n { margin-left: auto; font: 900 46px Montserrat; color: rgba(255,255,255,.25); }
+/* risultati */
+.cards { position: relative; width: 960px; height: 820px; margin-top: 40px; }
+.card { position: absolute; left: 50%; width: 820px; margin-left: -410px; padding: 34px 40px; text-align: left; }
+.card .top { display: flex; align-items: center; gap: 22px; font: 800 46px Montserrat; }
+.card .ic { width: 78px; height: 78px; border-radius: 22px; display: grid; place-items: center; font-size: 44px; }
+.card p { font: 500 35px/1.4 Inter; color: #d9dbea; margin-top: 18px; }
+.bar { height: 12px; border-radius: 6px; background: rgba(255,255,255,.12); margin-top: 22px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; border-radius: 6px; background: linear-gradient(90deg, var(--mint), var(--blue)); }
+.timer { position: absolute; right: -10px; top: -40px; width: 190px; height: 190px; border-radius: 50%; display: grid; place-items: center; font: 900 54px Montserrat; color: var(--ink); background: var(--gold); box-shadow: 0 0 80px rgba(255,194,26,.6); }
+/* libro */
+.book3d { perspective: 2000px; margin-top: 10px; }
+.book3d .b { position: relative; width: 560px; height: 840px; transform-style: preserve-3d; }
+.book3d img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px 16px 16px 6px; box-shadow: 50px 60px 90px rgba(0,0,0,.6), 0 0 140px rgba(255,194,26,.35); display: block; }
+.book3d .shine { position: absolute; inset: 0; border-radius: 6px 16px 16px 6px; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.38) 50%, transparent 65%); background-size: 300% 100%; mix-blend-mode: screen; }
+.badge { position: absolute; font: 900 40px Montserrat; color: var(--ink); background: var(--gold); padding: 18px 30px; border-radius: 999px; box-shadow: 0 20px 50px rgba(255,194,26,.45); white-space: nowrap; }
+.stars { font-size: 52px; letter-spacing: 10px; margin-top: 30px; color: var(--gold); }
+/* cta */
+.btn { margin-top: 60px; font: 900 78px Montserrat; color: var(--ink); background: linear-gradient(180deg, #ffd760, #ffb800); padding: 40px 80px; border-radius: 999px; box-shadow: 0 30px 80px rgba(255,194,26,.5), inset 0 -8px 0 rgba(0,0,0,.12); }
+.hand { position: absolute; font-size: 130px; }
+.ring { position: absolute; width: 160px; height: 160px; border-radius: 50%; border: 6px solid var(--gold); opacity: 0; }
+/* transizione */
+.wipe { position: absolute; left: -30%; width: 160%; height: 380px; transform: rotate(-12deg); opacity: 0; }
+/* sottotitoli */
+#cap { position: absolute; left: 450px; right: 40px; top: 1480px; display: flex; justify-content: center; }
+#cap .p { font: 900 52px Montserrat; padding: 16px 30px; border-radius: 26px; background: rgba(7,7,13,.55); border: 2px solid rgba(255,255,255,.12); white-space: nowrap; }
+#cap .on { color: var(--gold); }
+#prog { position: absolute; left: 270px; right: 270px; top: 132px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.15); }
+#prog i { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--gold); }
+#handle { position: absolute; top: 160px; left: 0; right: 0; text-align: center; font: 800 30px Montserrat; color: rgba(255,255,255,.75); letter-spacing: .04em; }
+</style></head><body>
+<div id="stage">
+  <div class="blob" id="b1" style="width:900px;height:900px;background:var(--pink)"></div>
+  <div class="blob" id="b2" style="width:800px;height:800px;background:var(--blue)"></div>
+  <div class="blob" id="b3" style="width:700px;height:700px;background:var(--gold);opacity:.35"></div>
+  <div id="floor"></div>
+  <canvas id="parts" width="1080" height="1920"></canvas>
+  <svg id="grain" width="1080" height="1920"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(#n)"/></svg>
+  <div id="scenes"></div>
+  <div class="wipe" id="w1" style="background:linear-gradient(90deg,var(--gold),#ffdf7a)"></div>
+  <div class="wipe" id="w2" style="background:linear-gradient(90deg,var(--pink),#ff8fcf);height:260px"></div>
+  <div id="prog"><i></i></div><div id="handle"></div>
+  <div id="cap"></div>
+</div>
+<script>
+let TL, D, CAPS = [], TYPERS = [];
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+// tempo (assoluto) in cui viene pronunciata una parola della scena
+function wordTime(sc, key, fallback) {
+  const k = norm(key); const w = sc.words.find(w => norm(w[2]).startsWith(k));
+  return w ? sc.t0 + w[0] : fallback;
+}
+function el(html) { const d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstChild; }
+
+const BUILD = {
+  hook(sc, S, tl) {
+    const d = sc.data;
+    S.innerHTML = `<div class="zone"><div class="kicker">${esc(d.kicker)}</div>
+      <div style="font-size:170px;margin:40px 0 10px" class="lock">🔐</div>
+      <div class="title hk">${d.title.map(l => `<div class="ln">${l.split("").map(c => `<span class="ch" style="display:inline-block">${c === " " ? "&nbsp;" : esc(c)}</span>`).join("")}</div>`).join("")}</div>
+      <div class="sub">${esc(d.sub)}</div></div>`;
+    tl.from($(".kicker", S), { y: 40, opacity: 0, duration: .5, ease: "power3.out" }, sc.t0 + .1)
+      .from($(".lock", S), { scale: 0, rotation: -40, duration: .7, ease: "back.out(2)" }, sc.t0 + .15)
+      .from(S.querySelectorAll(".ch"), { y: 140, opacity: 0, rotationX: -90, duration: .55, stagger: .035, ease: "back.out(1.6)" }, sc.t0 + .3)
+      .from($(".sub", S), { y: 30, opacity: 0, duration: .5 }, sc.t0 + 1.2)
+      .to($(".lock", S), { scale: 1.12, duration: .35, yoyo: true, repeat: 3, ease: "sine.inOut" }, sc.t0 + 1.6);
+  },
+  chat(sc, S, tl) {
+    const d = sc.data;
+    S.innerHTML = `<div class="zone"><div class="kicker" style="margin-bottom:34px">${esc(d.kicker)}</div>
+      <div class="phone"><div class="notch"></div><div class="hdr"><div class="av">✦</div><div>${esc(d.app)}<div style="font:500 22px Inter;color:#8d93ad">online</div></div></div>
+      <div class="msgs"></div><div class="inp"><span class="tx"></span></div></div>
+      ${d.stamp ? `<div class="stamp" style="top:560px;right:30px">${esc(d.stamp)}</div>` : ""}</div>`;
+    const phone = $(".phone", S);
+    tl.from(phone, { y: 500, rotation: 8, opacity: 0, duration: .8, ease: "power3.out" }, sc.t0)
+      .from($(".kicker", S), { y: -30, opacity: 0, duration: .5 }, sc.t0 + .2);
+    if (d.stamp) tl.from($(".stamp", S), { scale: 3, opacity: 0, duration: .35, ease: "power4.in" }, sc.t1 - 1.6);
+    const len = d.prompt.replace(/\*\*/g, "").length, tType = Math.min((sc.t1 - sc.t0) * .38, len / 30);
+    TYPERS.push({ sc, S, d, t0: sc.t0 + .7, tType });
+  },
+  ingredients(sc, S, tl) {
+    const d = sc.data, cols = ["#ff4fae", "#4d7cff", "#3ee6b4", "#ffc21a", "#a77bff"];
+    S.innerHTML = `<div class="zone" style="justify-content:flex-start;top:200px"><div class="title grad" style="font-size:96px">${esc(d.title)}</div>
+      <div class="chips">${d.items.map((it, k) => `<div class="chip glass"><div class="ic" style="background:${cols[k]}33;border:2px solid ${cols[k]}">${it.icon}</div><div><b style="color:${cols[k]}">${esc(it.label)}</b><span>${esc(it.ex)}</span></div><div class="n">0${k + 1}</div></div>`).join("")}</div></div>`;
+    tl.from($(".title", S), { scale: .6, opacity: 0, duration: .5, ease: "back.out(2)" }, sc.t0 + .05);
+    const chips = S.querySelectorAll(".chip"); const span = sc.t1 - sc.t0;
+    tl.set(chips, { opacity: .22, scale: .94, filter: "grayscale(1)" }, sc.t0)
+      .from(chips, { y: 80, duration: .5, stagger: .08, ease: "power3.out" }, sc.t0 + .15);
+    d.items.forEach((it, k) => {
+      const at = wordTime(sc, it.word, sc.t0 + span * (.3 + k * .12)) - .12;
+      tl.fromTo(chips[k], { opacity: .22, scale: .94, filter: "grayscale(1)" }, { opacity: 1, scale: 1, filter: "grayscale(0)", duration: .35, ease: "back.out(2)", immediateRender: false }, at)
+        .from(chips[k].querySelector(".ic"), { scale: 0, rotation: -90, duration: .45, ease: "back.out(2.5)", immediateRender: false }, at)
+        .to(chips[k], { boxShadow: `0 0 70px ${cols[k]}aa`, duration: .2, yoyo: true, repeat: 1 }, at + .3);
+    });
+  },
+  results(sc, S, tl) {
+    const d = sc.data, cols = ["#4d7cff", "#ff4fae", "#3ee6b4"];
+    S.innerHTML = `<div class="zone"><div class="title grad" style="font-size:96px">${esc(d.title)}</div>
+      <div class="cards">${d.cards.map((c, k) => `<div class="card glass" style="top:${k * 265}px"><div class="top"><div class="ic" style="background:${cols[k]}">${c.icon}</div>${esc(c.label)}</div><p>${esc(c.line)}</p><div class="bar"><i></i></div></div>`).join("")}
+      <div class="timer">${esc(d.timer)}</div></div></div>`;
+    tl.from($(".title", S), { y: -60, opacity: 0, duration: .5 }, sc.t0 + .05)
+      .from($(".timer", S), { scale: 0, rotation: -120, duration: .6, ease: "back.out(2)" }, sc.t0 + .3)
+      .to($(".timer", S), { rotation: 8, duration: .25, yoyo: true, repeat: 7, ease: "sine.inOut" }, sc.t0 + .9);
+    const cards = S.querySelectorAll(".card"), span = sc.t1 - sc.t0;
+    tl.set(cards, { opacity: .2, scale: .94, filter: "grayscale(1)" }, sc.t0).from(cards, { y: 120, duration: .5, stagger: .1, ease: "power3.out" }, sc.t0 + .15);
+    d.cards.forEach((c, k) => {
+      const at = wordTime(sc, c.word, sc.t0 + span * (.25 + k * .18)) - .15;
+      tl.fromTo(cards[k], { opacity: .2, scale: .94, filter: "grayscale(1)" }, { opacity: 1, scale: 1, filter: "grayscale(0)", duration: .4, ease: "back.out(1.8)", immediateRender: false }, at)
+        .to(cards[k].querySelector(".bar i"), { width: "100%", duration: .8, ease: "power2.inOut" }, at + .3);
+    });
+  },
+  book(sc, S, tl) {
+    const d = sc.data;
+    S.innerHTML = `<div class="zone" style="top:210px"><div class="book3d"><div class="b"><img src="${d.cover}"><div class="shine"></div></div></div>
+      <div class="badge" style="top:60px;right:-10px">${esc(d.badge)}</div><div class="stars">★★★★★</div></div>`;
+    const b = $(".b", S);
+    tl.fromTo(b, { rotationY: -75, rotationX: 10, scale: .6, opacity: 0 }, { rotationY: -16, rotationX: 4, scale: 1, opacity: 1, duration: 1.1, ease: "power3.out" }, sc.t0)
+      .to(b, { rotationY: 12, duration: sc.t1 - sc.t0 - 1.1, ease: "sine.inOut" }, sc.t0 + 1.1)
+      .fromTo($(".shine", S), { backgroundPosition: "120% 0" }, { backgroundPosition: "-60% 0", duration: 1.4, ease: "power2.inOut" }, sc.t0 + .9)
+      .from($(".badge", S), { scale: 0, rotation: 30, duration: .5, ease: "back.out(2.5)" }, wordTime(sc, d.badgeWord || "sessanta", sc.t0 + 2))
+      .from(S.querySelectorAll(".stars"), { y: 40, opacity: 0, duration: .5 }, sc.t0 + 1.3);
+  },
+  cta(sc, S, tl) {
+    const d = sc.data;
+    S.innerHTML = `<div class="zone"><div class="title grad" style="font-size:120px">${esc(d.title)}</div>
+      <div class="btn">${esc(d.button)}</div><div class="sub" style="margin-top:46px">${esc(d.sub)}</div>
+      <div class="ring" style="left:540px;top:600px"></div><div class="hand" style="left:600px;top:640px">👆</div></div>`;
+    tl.from($(".title", S), { y: 80, opacity: 0, duration: .5, ease: "power3.out" }, sc.t0 + .05)
+      .from($(".btn", S), { scale: 0, duration: .6, ease: "elastic.out(1,.6)" }, sc.t0 + .35)
+      .from($(".hand", S), { x: 260, y: 300, opacity: 0, duration: .6, ease: "power2.out" }, sc.t0 + .9)
+      .to($(".hand", S), { scale: .85, duration: .12, yoyo: true, repeat: 1 }, sc.t0 + 1.5)
+      .to($(".btn", S), { scale: .94, duration: .12, yoyo: true, repeat: 1 }, sc.t0 + 1.5)
+      .fromTo($(".ring", S), { scale: .3, opacity: 1 }, { scale: 2.2, opacity: 0, duration: .7 }, sc.t0 + 1.55)
+      .to($(".btn", S), { scale: 1.05, duration: .4, yoyo: true, repeat: 5, ease: "sine.inOut" }, sc.t0 + 1.9);
+  },
+};
+
+window.setup = (data) => {
+  D = data; $("#handle").textContent = data.handle || "";
+  TL = gsap.timeline({ paused: true });
+  const host = $("#scenes");
+  D.scenes.forEach((sc, i) => {
+    const S = el(`<div class="scene"></div>`); host.append(S);
+    BUILD[sc.kind](sc, S, TL);
+    // entrata / uscita della scena
+    TL.set(S, { opacity: 1 }, sc.t0);
+    if (i > 0) TL.from(S, { yPercent: 8, scale: 1.06, filter: "blur(18px)", duration: .45, ease: "power3.out" }, sc.t0);
+    if (i < D.scenes.length - 1) TL.to(S, { scale: .9, opacity: 0, filter: "blur(14px)", duration: .35, ease: "power2.in" }, sc.t1 - .3);
+    TL.fromTo(S, { scale: S._s || 1 }, { scale: 1.035, duration: sc.t1 - sc.t0 - .4, ease: "none", immediateRender: false }, sc.t0 + .45);
+    if (i > 0) {
+      TL.fromTo("#w1", { y: 2300, opacity: 1 }, { y: -700, duration: .5, ease: "power2.inOut" }, sc.t0 - .28)
+        .fromTo("#w2", { y: 2500, opacity: .9 }, { y: -500, duration: .55, ease: "power2.inOut" }, sc.t0 - .24);
+    }
+  });
+  TL.to("#prog i", { width: "100%", duration: D.total, ease: "none" }, 0);
+  // gruppi di sottotitoli (max 2 parole)
+  D.scenes.forEach(sc => {
+    let g = [];
+    sc.words.forEach((w, k) => { const nx = sc.words[k + 1]; g.push(w); if (g.length === 2 || (nx && (g.map(x => x[2]).join(' ') + ' ' + nx[2]).length > 13) || /[.,!?;:]$/.test(w[2]) || k === sc.words.length - 1) { CAPS.push({ t0: sc.t0 + g[0][0], t1: sc.t0 + g[g.length - 1][1] + .12, ws: g.map(x => ({ w: x[2], a: sc.t0 + x[0] })) }); g = []; } });
+  });
+  for (let k = 0; k < CAPS.length - 1; k++) CAPS[k].t1 = Math.min(CAPS[k].t1, CAPS[k + 1].t0);
+};
+
+// particelle deterministiche
+const P = Array.from({ length: 90 }, (_, i) => { const r = n => { const s = Math.sin((i + 1) * 9301 + n * 49297) * 233280; return s - Math.floor(s); }; return { x: r(1) * 1080, y: r(2) * 1920, s: 1 + r(3) * 3.5, v: 20 + r(4) * 60, p: r(5) * 6.28, c: r(6) }; });
+function particles(t) {
+  const c = $("#parts").getContext("2d"); c.clearRect(0, 0, 1080, 1920);
+  for (const q of P) { const y = ((q.y - t * q.v) % 1920 + 1920) % 1920; c.globalAlpha = .25 + .55 * (.5 + .5 * Math.sin(t * 2 + q.p)); c.fillStyle = q.c < .33 ? "#ffc21a" : q.c < .66 ? "#ff8fcf" : "#ffffff"; c.beginPath(); c.arc(q.x + Math.sin(t * .6 + q.p) * 20, y, q.s, 0, 6.283); c.fill(); }
+}
+
+window.seek = (t) => {
+  TL.seek(t, false);
+  // sfondo vivo
+  $("#b1").style.transform = `translate(${-200 + Math.sin(t * .35) * 220}px, ${200 + Math.cos(t * .28) * 180}px)`;
+  $("#b2").style.transform = `translate(${500 + Math.cos(t * .3) * 200}px, ${900 + Math.sin(t * .25) * 260}px)`;
+  $("#b3").style.transform = `translate(${200 + Math.sin(t * .22 + 1) * 260}px, ${1300 + Math.cos(t * .33) * 160}px)`;
+  $("#floor").style.backgroundPosition = `0 ${t * 60}px`;
+  particles(t);
+  // digitazione nelle chat
+  for (const T of TYPERS) {
+    const { sc, S, d } = T; if (t < sc.t0 - .1 || t > sc.t1 + .1) continue;
+    const plain = d.prompt.replace(/\*\*/g, ""), lt = t - T.t0;
+    const rich = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b style="color:#ffc21a">$1</b>');
+    const msgs = $(".msgs", S), inp = $(".tx", S);
+    if (lt < T.tType + .2) {
+      const n = Math.max(0, Math.floor(plain.length * Math.min(1, lt / T.tType)));
+      inp.innerHTML = (n ? `<span style="color:#fff">${esc(plain.slice(0, n)).slice(-34)}</span>` : esc(d.placeholder)) + '<span class="caret"></span>';
+      msgs.innerHTML = "";
+    } else {
+      inp.textContent = d.placeholder;
+      const tAns = lt - T.tType - .2; let h = `<div class="bub bu">${rich(d.prompt)}</div>`;
+      if (tAns < .7) h += `<div class="bub ba" style="letter-spacing:6px">${"•••".split("").map((c, k) => `<span style="opacity:${k === Math.floor(tAns * 6) % 3 ? 1 : .3}">${c}</span>`).join("")}</div>`;
+      else { const ans = d.answer, m = Math.floor(ans.length * Math.min(1, (tAns - .7) / Math.max(.8, (sc.t1 - T.t0 - T.tType - 1.5)))); h += `<div class="bub ba">${esc(ans.slice(0, m))}</div>`; }
+      msgs.innerHTML = h;
+    }
+  }
+  // sottotitoli
+  const c = CAPS.find(c => t >= c.t0 && t < c.t1);
+  $("#cap").innerHTML = c ? `<div class="p">${c.ws.map(w => `<span class="${t >= w.a ? "on" : ""}">${esc(w.w.toUpperCase())}</span>`).join(" ")}</div>` : "";
+};
+window.READY = true;
+</script></body></html>

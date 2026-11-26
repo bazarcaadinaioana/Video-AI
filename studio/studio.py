@@ -306,7 +306,9 @@ def make(project_path, out_path):
                          "no_captions": sc.get("no_captions", False), "caption_y": sc.get("caption_y"), "caption_x": sc.get("caption_x")})
         voice_parts.append((mp3, t))
         # video della scena
-        if sc.get("screen"):
+        if P.get("motion"):
+            timeline[-1]["motion"] = {"kind": sc["motion"], "data": sc.get("data", {})}
+        elif sc.get("screen"):
             scr = sc["screen"]
             src = clip_file(str(scr["clip"]))
             seg = work / f"s{i:02d}.mp4"
@@ -335,11 +337,30 @@ def make(project_path, out_path):
                 segs.append(seg)
         t += dur
     total = t
-    # unisci i segmenti
-    lst = work / "list.txt"
-    lst.write_text("".join(f"file '{s}'\n" for s in segs))
     joined = work / "joined.mp4"
-    run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", str(joined)])
+    if P.get("motion"):
+        # grafica animata disegnata a codice, sincronizzata con le parole
+        import base64
+        def data_url(f):
+            f = base / f
+            return f"data:image/{'png' if str(f).endswith('.png') else 'jpeg'};base64," + base64.b64encode(f.read_bytes()).decode()
+        mscenes = []
+        for tl_ in timeline:
+            d = dict(tl_["motion"]["data"])
+            if "cover" in d:
+                d["cover"] = data_url(d["cover"])
+            mscenes.append({"t0": tl_["t0"], "t1": tl_["t1"], "kind": tl_["motion"]["kind"], "data": d, "words": tl_["words"]})
+        mj = work / "motion.json"
+        mj.write_text(json.dumps({"total": total, "handle": P["brand"].get("handle", ""), "scenes": mscenes}))
+        subprocess.run(["node", str(Path(__file__).parent / "motion_render.js"), str(mj), str(joined), str(FPS)], check=True)
+        P = {**P, "hook_text": None, "brand": {**P["brand"], "handle": None}}
+        for tl_ in timeline:
+            tl_["no_captions"] = True
+    else:
+        # unisci i segmenti
+        lst = work / "list.txt"
+        lst.write_text("".join(f"file '{s}'\n" for s in segs))
+        run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", str(joined)])
     # sottotitoli
     ass = work / "subs.ass"
     build_ass(P, timeline, ass)
