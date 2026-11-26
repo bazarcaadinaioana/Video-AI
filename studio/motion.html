@@ -321,7 +321,7 @@ Object.assign(BUILD, {
       .from($(".lab", S), { x: -60, opacity: 0, duration: .45 }, sc.t0 + .2)
       .from($(".plan", S), { y: 120, opacity: 0, scale: .9, duration: .55, ease: "power3.out" }, sc.t0 + .35);
     const start = wordTime(sc, d.fillWord || "", sc.t0 + 1.5);
-    tl.from(S.querySelectorAll(".ev"), { scale: 0, opacity: 0, duration: .35, stagger: .12, ease: "back.out(2.4)" }, start);
+    tl.from(S.querySelectorAll(".ev"), { scale: 0, opacity: 0, duration: .3, stagger: .07, ease: "back.out(2.4)" }, start);
   },
   summary(sc, S, tl) {
     const d = sc.data;
@@ -331,7 +331,7 @@ Object.assign(BUILD, {
     tl.from($(".num", S), { scale: 0, rotation: -30, duration: .5, ease: "back.out(2.2)" }, sc.t0 + .05)
       .from($(".lab", S), { x: -60, opacity: 0, duration: .45 }, sc.t0 + .2);
     const tDoc = wordTime(sc, d.docWord || "", sc.t0 + 1.2) - .2, tSum = wordTime(sc, d.sumWord || "", tDoc + 1.6) - .3;
-    tl.from(S.querySelectorAll(".doc"), { y: -900, rotation: -30, duration: .6, stagger: .08, ease: "power3.out" }, tDoc)
+    tl.from(S.querySelectorAll(".doc"), { y: -1500, rotation: -30, duration: .6, stagger: .08, ease: "power3.out" }, tDoc)
       .to(S.querySelectorAll(".doc"), { scale: .15, x: -140, y: 260, opacity: 0, duration: .5, ease: "power3.in" }, tSum)
       .from($(".sum", S), { scale: .3, opacity: 0, duration: .55, ease: "back.out(1.6)" }, tSum + .35)
       .from(S.querySelectorAll(".sum li"), { x: 60, opacity: 0, duration: .3, stagger: .18 }, tSum + .6);
@@ -340,7 +340,7 @@ Object.assign(BUILD, {
     const d = sc.data;
     S.innerHTML = `<div class="zone" style="top:300px;height:300px;justify-content:flex-start"><div class="title grad" style="font-size:96px">${esc(d.title)}</div></div>
       <div class="book3d" style="position:absolute;left:60px;top:500px"><div class="b" style="width:480px;height:720px"><img src="${d.cover}"><div class="shine"></div></div></div>
-      <div class="badge" style="left:360px;top:470px">${esc(d.badge)}</div>
+      <div class="badge" style="left:330px;top:1150px">${esc(d.badge)}</div>
       <div class="btn" style="position:absolute;left:70px;top:1270px;margin:0;font-size:60px;padding:30px 60px">${esc(d.button)}</div>`;
     const b = $(".b", S);
     tl.from($(".title", S), { y: -60, opacity: 0, duration: .5 }, sc.t0 + .05)
