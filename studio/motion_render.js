@@ -13,7 +13,7 @@ const { chromium } = require('playwright'); const fs = require('fs'), path = req
   const ff = spawn('ffmpeg', ['-v', 'error', '-y', '-f', 'image2pipe', '-framerate', String(F), '-c:v', 'mjpeg', '-i', '-', '-frames:v', String(N),
     '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '17', '-pix_fmt', 'yuv420p', out], { stdio: ['pipe', 'inherit', 'inherit'] });
   for (let i = 0; i < N; i++) {
-    await p.evaluate(t => seek(t), i / F);
+    await p.evaluate(async t => { seek(t); const im = document.getElementById('nova'); if (im && im.style.display !== 'none' && im.src) { try { await im.decode(); } catch (e) {} } }, i / F);
     const jpg = await p.screenshot({ type: 'jpeg', quality: 92 });
     if (!ff.stdin.write(jpg)) await new Promise(r => ff.stdin.once('drain', r));
   }

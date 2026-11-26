@@ -350,8 +350,33 @@ def make(project_path, out_path):
             if "cover" in d:
                 d["cover"] = data_url(d["cover"])
             mscenes.append({"t0": tl_["t0"], "t1": tl_["t1"], "kind": tl_["motion"]["kind"], "data": d, "words": tl_["words"]})
+        mdata = {"total": total, "fps": FPS, "handle": P["brand"].get("handle", ""), "scenes": mscenes}
+        mdata.update({k: P[k] for k in ("capTop", "capLeft", "capRight") if k in P})
+        M = P.get("mascot")
+        if M and M.get("move"):
+            # Nova si muove dentro l'animazione: voce completa -> labiale, pose dalle scene
+            keys, poses = [], []
+            for sc_, tl_ in zip(P["scenes"], timeline):
+                for k in sc_.get("nova", []):
+                    at = tl_["t0"] + k.get("at", 0)
+                    keys.append({"t": at, "x": k["x"], "y": k["y"], "w": k.get("w", 560), "ease": k.get("ease")})
+                    if k.get("pose"):
+                        poses.append({"t": at, "pose": k["pose"]})
+            keys.sort(key=lambda k: k["t"])
+            vwav = work / "voice.wav"
+            vf = [f"[{k}:a]adelay={int(st * 1000)}|{int(st * 1000)}[a{k}]" for k, (mp3, st) in enumerate(voice_parts)]
+            vf.append("".join(f"[a{k}]" for k in range(len(voice_parts))) + f"amix=inputs={len(voice_parts)}:normalize=0,apad,atrim=0:{total:.2f}[o]")
+            run(["ffmpeg", "-v", "error", "-y", *sum([["-i", str(m)] for m, _ in voice_parts], []), "-filter_complex", ";".join(vf), "-map", "[o]", "-ac", "1", "-ar", "24000", str(vwav)])
+            fr = work / "mascot"
+            if fr.exists():
+                for f in fr.glob("*.png"):
+                    f.unlink()
+            pj = work / "poses.json"; pj.write_text(json.dumps(poses))
+            subprocess.run(["node", str(Path(__file__).parent / "robot3d.js"), str(vwav), str(fr), str(FPS), f"{total:.2f}", P["brand"].get("accent", "#FFD233"), str(M.get("size", 600)), M.get("glow", "#ff4fae"), M.get("kind", "nova3d"), str(pj)], check=True, capture_output=True)
+            mdata["nova"] = {"dir": "file://" + str(fr), "frames": len(list(fr.glob("*.png"))), "keys": keys}
+            P = {**P, "mascot": None}
         mj = work / "motion.json"
-        mj.write_text(json.dumps({"total": total, "handle": P["brand"].get("handle", ""), "scenes": mscenes}))
+        mj.write_text(json.dumps(mdata))
         subprocess.run(["node", str(Path(__file__).parent / "motion_render.js"), str(mj), str(joined), str(FPS)], check=True)
         P = {**P, "hook_text": None, "brand": {**P["brand"], "handle": None}}
         for tl_ in timeline:

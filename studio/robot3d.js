@@ -5,7 +5,7 @@ const { chromium } = require('playwright'); const fs = require('fs'), path = req
 (async () => {
   const args = process.argv.slice(2);
   const preview = args[0] === '--preview';
-  const [wav, outDir, fps = '30', dur = '1', accent = '#FFC21A', width = '600', glow = '#6be4ff', sceneName = 'robot3d'] = preview ? [null, null, '30', '1', '#FFC21A', '600', args[2] || '#6be4ff', args[3] || 'robot3d'] : args;
+  const [wav, outDir, fps = '30', dur = '1', accent = '#FFC21A', width = '600', glow = '#6be4ff', sceneName = 'robot3d', posesPath = ''] = preview ? [null, null, '30', '1', '#FFC21A', '600', args[2] || '#6be4ff', args[3] || 'robot3d', args[4] || ''] : args;
   const Wd = +width, Ht = Math.round(Wd * 1.15), F = +fps;
   const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: Wd, height: Ht } });
@@ -13,10 +13,11 @@ const { chromium } = require('playwright'); const fs = require('fs'), path = req
   await p.route('https://local.test/**', r => { const u = new URL(r.request().url()); const f = path.join(__dirname, '..', decodeURIComponent(u.pathname)); r.fulfill({ path: f, contentType: f.endsWith('.js') ? 'text/javascript' : 'text/html' }); });
   await p.goto(`https://local.test/studio/${sceneName}.html?w=${Wd}&h=${Ht}&accent=${encodeURIComponent(accent)}&glow=${encodeURIComponent(glow)}`);
   await p.waitForFunction(() => window.READY, null, { timeout: 60000 });
+  if (posesPath && fs.existsSync(posesPath)) await p.evaluate(ps => window.setPoses && setPoses(ps), JSON.parse(fs.readFileSync(posesPath, 'utf8')));
   if (preview) {
     // anteprima: 4 pose con bocca chiusa / aperta
     const shots = [];
-    for (const [i, o] of [[10, 0], [40, 0.9], [70, 0.5], [100, 0.2]]) {
+    for (const [i, o] of (posesPath ? JSON.parse(fs.readFileSync(posesPath, 'utf8')).map(p => [Math.round(p.t * 30) + 20, 0.4]) : [[10, 0], [40, 0.9], [70, 0.5], [100, 0.2]])) {
       await p.evaluate(([i, o]) => setLip(Array.from({ length: 200 }, () => ({ o, r: 0.3 }))), [i, o]);
       shots.push(await p.evaluate(([i]) => frame(i, 30), [i]));
     }
